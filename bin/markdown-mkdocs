@@ -1,0 +1,48 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Getopt::Long qw(GetOptions);
+use Markdown::MkDocs;
+my %opt;
+GetOptions('push' => \$opt{'push'}, 'branch=s' => \$opt{'branch'},
+    'remote=s' => \$opt{'remote'}, 'name=s' => \$opt{'name'}, 'help' => \$opt{'help'})
+    or die "invalid options\n";
+if ($opt{'help'}) {
+    print "Usage: markdown-mkdocs build|serve|pages [--push] [--branch NAME] [--remote NAME]\n";
+    exit 0;
+}
+my $action=shift(@ARGV) || 'build';
+die "unknown action: $action\n" unless $action=~/^(?:build|serve|pages)$/;
+die "--push requires pages\n" if $opt{'push'} && $action ne 'pages';
+Markdown::MkDocs->new(\%opt)->$action();
+__END__
+
+=begin markdown
+
+# NAME
+
+markdown-mkdocs - build and preview Markdown sites
+
+# USAGE
+
+Run `markdown-mkdocs build` in a documented repository.
+`serve` starts MkDocs preview; `pages` builds and commits to gh-pages locally.
+Only `pages --push` pushes, using origin unless --remote is supplied.
+Use --branch to select another publication branch. Failures exit nonzero.
+
+=end markdown
+
+
+=head1 NAME
+
+markdown-mkdocs - build and preview Markdown sites
+
+
+=head1 USAGE
+
+Run C<markdown-mkdocs build> in a documented repository.
+C<serve> starts MkDocs preview; C<pages> builds and commits to gh-pages locally.
+Only C<pages --push> pushes, using origin unless --remote is supplied.
+Use --branch to select another publication branch. Failures exit nonzero.
+
+=cut

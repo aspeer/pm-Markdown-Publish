@@ -1,0 +1,106 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(GetOptions);
+use ASPEER::Markdown::Publish;
+
+
+sub main {
+
+    my (%opt, @source_dn);
+    GetOptions(
+        'backend=s' => \$opt{'backend'},
+        'config=s'  => \$opt{'config'},
+        'source=s'  => \@source_dn,
+        'name=s'    => \$opt{'name'},
+        'output=s'  => \$opt{'output'},
+        'branch=s'  => \$opt{'branch'},
+        'remote=s'  => \$opt{'remote'},
+        'help'      => \$opt{'help'}
+    ) || die "invalid options\n";
+    if ($opt{'help'}) {
+        print "Usage: markdown-publish BACKEND ACTION [options]\n";
+        print "Backends: mkdocs, vitepress, docusaurus, starlight\n";
+        print "Actions: build, serve, gh_publish, gh_push\n";
+        return 0;
+    }
+
+    my $backend=shift(@ARGV) || 'mkdocs';
+    my $action=shift(@ARGV) || 'build';
+    die "unexpected arguments: @ARGV\n" if @ARGV;
+    my $publish_or;
+    if ($opt{'config'}) {
+        $publish_or=ASPEER::Markdown::Publish->load_config($opt{'config'});
+    }
+    elsif (-f 'doc/project.json') {
+        $publish_or=ASPEER::Markdown::Publish->load_config('doc/project.json');
+    }
+    else {
+        $publish_or=ASPEER::Markdown::Publish->new();
+    }
+    $publish_or->{'sources'}=\@source_dn if @source_dn;
+    foreach my $name (qw(name output branch remote)) {
+        $publish_or->{$name}=$opt{$name} if defined($opt{$name});
+    }
+    $publish_or->run($backend, $action);
+    return 0;
+
+}
+
+
+exit(main());
+
+__END__
+
+=begin markdown
+
+# NAME
+
+markdown-publish - build, preview, and publish Perl distribution documentation
+
+# USAGE
+
+```sh
+markdown-publish mkdocs build
+markdown-publish mkdocs serve
+markdown-publish mkdocs gh_publish
+markdown-publish mkdocs gh_push
+```
+
+The backend may be `mkdocs`, `vitepress`, `docusaurus`, or `starlight`.
+`gh_publish` changes only the local publication branch. `gh_push` is the
+explicit remote operation.
+
+Options include `--config FILE`, repeatable `--source DIRECTORY`, `--name`,
+`--output`, `--branch`, and `--remote`. Without `--config`, an existing
+`doc/project.json` is read. Otherwise the module's convention-based defaults
+are used.
+
+
+=end markdown
+
+
+=head1 NAME
+
+markdown-publish - build, preview, and publish Perl distribution documentation
+
+
+=head1 USAGE
+
+
+ markdown-publish mkdocs build
+ markdown-publish mkdocs serve
+ markdown-publish mkdocs gh_publish
+ markdown-publish mkdocs gh_push
+The backend may be C<mkdocs>, C<vitepress>, C<docusaurus>, or C<starlight>.
+C<gh_publish> changes only the local publication branch. C<gh_push> is the
+explicit remote operation.
+
+Options include C<--config FILE>, repeatable C<--source DIRECTORY>, C<--name>,
+C<--output>, C<--branch>, and C<--remote>. Without C<--config>, an existing
+C<doc/project.json> is read. Otherwise the module's convention-based defaults
+are used.
+
+=cut

@@ -1,0 +1,20 @@
+requires 'IPC::Run3';
+requires 'JSON::PP';
+requires 'File::Temp';
+requires 'Cwd';
+requires 'File::Copy';
+requires 'File::Find';
+requires 'File::Path';
+requires 'File::Spec';
+requires 'Getopt::Long';
+requires 'strict';
+requires 'vars';
+requires 'warnings';
+requires 'perl', '5.008';
+on configure => sub {
+    requires 'ExtUtils::MakeMaker';
+    requires 'perl', '5.008';
+    requires 'version';
+    suggests 'ASPEER::MakeMaker::Markdown::Pod';
+};
+on test => sub { requires 'Test::More'; };

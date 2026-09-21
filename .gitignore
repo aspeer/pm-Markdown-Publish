@@ -1,0 +1,11 @@
+Makefile
+MYMETA.*
+blib/
+pm_to_blib
+site/
+*.bak
+Markdown-MkDocs-*/
+Markdown-MkDocs-*.tar.gz
+ASPEER-Markdown-Publish-*/
+ASPEER-Markdown-Publish-*.tar.gz
+/.markdown-pod.json
