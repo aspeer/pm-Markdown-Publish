@@ -2,6 +2,7 @@ requires 'IPC::Run3';
 requires 'JSON::PP';
 requires 'File::Temp';
 requires 'Cwd';
+requires 'Exporter';
 requires 'File::Copy';
 requires 'File::Find';
 requires 'File::Path';
@@ -15,6 +16,6 @@ on configure => sub {
     requires 'ExtUtils::MakeMaker';
     requires 'perl', '5.008';
     requires 'version';
-    suggests 'ASPEER::MakeMaker::Markdown::Pod';
+    suggests 'ASPEER::MakeMaker::Markdown::Pod', '0.012';
 };
 on test => sub { requires 'Test::More'; };

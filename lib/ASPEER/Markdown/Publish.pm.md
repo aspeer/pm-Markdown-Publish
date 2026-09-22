@@ -1,6 +1,6 @@
 # NAME
 
-ASPEER::Markdown::Publish - publish Perl distribution documentation with multiple site generators
+ASPEER::Markdown::Publish - common documentation publication operations
 
 # SYNOPSIS
 
@@ -8,197 +8,144 @@ ASPEER::Markdown::Publish - publish Perl distribution documentation with multipl
 use ASPEER::Markdown::Publish;
 
 my $publish_or=ASPEER::Markdown::Publish->new({
+    module  => 'ASPEER::Markdown::Publish::MkDocs',
     sources => ['doc'],
-    mkdocs  => {
-        config => 'doc/mkdocs/mkdocs.yml',
-        output => 'site',
-    },
+    config  => 'doc/mkdocs/mkdocs.yml',
 });
 
-$publish_or->run('mkdocs', 'build');
-$publish_or->run('mkdocs', 'serve');
-$publish_or->run('mkdocs', 'gh_publish');
+$publish_or->run('build');
+$publish_or->run('serve');
+$publish_or->run('gh');
+$publish_or->run('cloudflare');
 ```
 
 # DESCRIPTION
 
-`ASPEER::Markdown::Publish` assembles Markdown documentation from a Perl
-distribution and delegates rendering to MkDocs, VitePress, Docusaurus, or
-Astro Starlight. It has no MakeMaker dependency. The companion
-`ASPEER::MakeMaker::Markdown::Publish` module supplies Makefile targets and
-passes `META_MERGE.x_documentation.publish` configuration to this module.
+This module selects one publishing engine and provides the shared operations
+for assembling Markdown, splitting chapters, normalising links and assets,
+and publishing a built site through a temporary Git worktree. The engine
+classes implement their own `prepare`, `build`, and `serve` methods. No
+Makefile is needed; `ASPEER::MakeMaker::Markdown::Publish` supplies optional
+MakeMaker targets.
 
-When `sources` is omitted, an existing `doc/` directory is the publication
-boundary. If `doc/` does not exist, `lib/` and `bin/` Markdown sidecars are used
-as a compatibility fallback. An existing but empty `doc/` directory does not
-fall back. An explicit source list is exact:
-
-```perl
-sources => [qw(doc lib bin)]
-```
-
-Multiple top-level headings in documents beneath `doc/` are split into stable
-pages. Explicit anchors and links between split chapters are preserved.
-For the Node-backed generators, Pandoc definition lists and attribute syntax
-are converted to portable Markdown and HTML equivalents in the disposable
-publication tree. Authored source documents are not changed.
+An existing `doc/` directory is the default publication boundary. When it is
+assembled, Markdown beneath `lib/` and `bin/` is mirrored under those paths in
+the temporary site documents. A guide can link to `lib/Example/Module.pm.md`.
+Mirrored pages are available through links but are not added to generated
+navigation. When `doc/` is absent, sidecars become the default source pages.
+Set `sources` explicitly to include other directories. Source files are never rewritten;
+assembly and engine-specific Markdown adjustments happen in temporary trees.
 
 # CONFIGURATION
 
-Common settings may be placed directly in the constructor hash. A backend hash
-overrides the corresponding common value:
+The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
+with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
+when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
+rather than nested beneath engine names:
 
 ```perl
 {
+    module  => 'ASPEER::Markdown::Publish::Docusaurus',
     sources => ['doc'],
     name    => 'Example documentation',
+    config  => 'doc/docusaurus/docusaurus.config.js',
     output  => 'site',
     branch  => 'gh-pages',
-    remote  => 'origin',
-
-    mkdocs => {
-        config      => 'doc/mkdocs/mkdocs.yml',
-        config_mode => 'inherit',
-        command     => 'mkdocs',
-        strict      => 1,
-        address     => '127.0.0.1:8000',
-    },
-
-    vitepress => {
-        config => 'doc/vitepress/config.mts',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 5173,
-        version => 'latest',
-    },
-
-    docusaurus => {
-        config => 'doc/docusaurus/docusaurus.config.js',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 3001,
-        version => 'latest',
-    },
-
-    starlight => {
-        config => 'doc/starlight/astro.config.mjs',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 4321,
-        astro_version     => 'latest',
-        starlight_version => 'latest',
-    },
+    remote  => 'github',
+    cloudflare => {config => 'wrangler.jsonc'},
 }
 ```
 
-A root `mkdocs.yml` is used directly because it owns its complete source-tree
-layout. Other MkDocs configuration paths are inherited by a temporary child
-configuration which supplies the assembled documentation, navigation, and
-output directory. Set `config_mode` to `direct` when a non-root configuration
-also owns its complete layout.
+The `config` path and other engine-specific options are described by the
+selected engine module. `load_config($filename)` accepts a JSON object
+containing the settings directly, under `publish`, or under
+`x_documentation.publish`. `new({config_file => $filename})` is equivalent.
+Do not combine `config_file` with inline settings.
 
-`load_config($filename)` reads JSON in any of these forms:
+For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
-```json
-{"sources":["doc"]}
+```jsonc
+{
+    "name": "example-docs",
+    "compatibility_date": "2026-09-22",
+    "assets": {
+        "directory": "./site",
+        "not_found_handling": "404-page"
+    },
+    "observability": {
+        "enabled": true,
+        "traces": {"enabled": true}
+    }
+}
 ```
 
-```json
-{"publish":{"sources":["doc"]}}
-```
-
-```json
-{"x_documentation":{"publish":{"sources":["doc"]}}}
-```
+Use the current compatibility date for a new Worker and choose the intended
+Worker name. The deploy action replaces `assets.directory` with the selected
+engine's actual build output; the authored file remains unchanged.
 
 # METHODS
 
 ## new
 
-Creates a publisher from a configuration hash reference.
+Loads and constructs the selected engine class. A direct engine-class
+constructor may be used when the class is already known.
 
 ## load_config
 
-Creates a publisher from a standalone JSON file.
+Reads a JSON configuration and constructs its selected engine.
 
 ## run
 
-```perl
-$publish_or->run($backend, $action);
-```
-
-Supported backends are `mkdocs`, `vitepress`, `docusaurus`, and `starlight`.
-Supported actions are:
-
-- `build`: render the static site.
-- `serve`: run the backend's foreground preview server.
-- `gh_publish`: build and commit the result to a local publication branch.
-- `gh_push`: perform `gh_publish`, then push the selected branch to the selected
-  remote.
-
-Remote publication is never implicit.
+Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
+site, updates the local publication branch, then pushes that branch to the
+configured remote. It defaults to a remote named `github` and fails if that
+remote does not exist. It is an explicit publishing action, not part of
+`build` or `serve`. `cloudflare` builds and deploys the static files to a
+Cloudflare Worker without committing or pushing Git.
 
 ## source_directories
 
-Returns the exact configured publication roots or the default roots selected by
-the `doc/` boundary rule.
+Returns the configured source roots or the default roots described above.
 
 ## prepare_docs
 
-Assembles source Markdown and assets in a temporary directory. It returns the
-temporary root, assembled documentation directory, and ordered page list.
+Assembles source Markdown and assets in a temporary directory. Returns the
+temporary root, assembled document directory, and ordered pages.
 
 ## split
 
-Splits a Markdown guide at top-level ATX headings, ignoring fenced examples,
-and repairs links to explicit anchors moved to another generated page.
+Splits a guide at top-level headings outside code fences and repairs links to
+anchors moved into another generated page.
 
-## prepare_mkdocs
+## publish_gh
 
-Returns a MkDocs configuration filename, generating a temporary configuration
-when assembly or inheritance is required.
+Builds, commits to a temporary worktree for the configured branch, and pushes
+that branch to the configured GitHub remote. It does not change the current
+checkout or force-push.
 
-## prepare_vitepress
+## publish_cloudflare
 
-Returns a temporary root, prepared VitePress documentation directory, and
-configuration filename. An authored configuration remains at its original
-location so its relative imports continue to resolve correctly. Generated
-navigation uses each page's authored title and preserves source order.
+Builds through the selected engine, then deploys that output as Workers Static
+Assets using Wrangler. Set `cloudflare.config` to an existing, dedicated
+Wrangler configuration file for the intended Worker. `cloudflare.wrangler`
+selects the executable (`wrangler` by default); `cloudflare.environment`
+optionally selects an authored Wrangler environment. The site directory is
+passed with `--assets`, overriding the config file's asset directory. Missing
+configuration or build output is fatal before deployment. Authentication
+comes from Wrangler's existing login or environment, not publication metadata.
 
-## prepare_docusaurus
-
-Returns a temporary root, prepared Docusaurus project directory, and
-configuration filename. Generated pages receive explicit title frontmatter and
-the sidebar preserves authored titles and source order.
-
-## prepare_starlight
-
-Returns a temporary root, prepared Astro Starlight project directory, and
-configuration filename. Generated navigation lists every page explicitly so
-root documents retain their authored titles and source order.
-
-## build
-
-Builds one supported backend and returns the absolute output directory.
-
-## serve
-
-Starts one supported backend's foreground development server.
-
-## gh_publish
-
-Builds a backend, updates a local publication branch through a temporary Git
-worktree, and optionally pushes when its second argument is true. Callers should
-normally use `run()` so local publication and explicit push remain distinct.
-
-# ERRORS
-
-Invalid configuration, missing source/configuration files, failed external
-commands, unsafe chapter identifiers, and Git failures are fatal.
+The Wrangler config owns the Worker name, compatibility date, routing, and
+other deployment settings. Use a static-assets-only config without a `main`
+script for this documentation workflow. Publishing to an existing Worker can
+update its settings; review its config before invoking this remote action.
 
 # SEE ALSO
 
-`ASPEER::MakeMaker::Markdown::Publish`, `ASPEER::MakeMaker::Markdown::Pod`
+`ASPEER::Markdown::Publish::MkDocs`,
+`ASPEER::Markdown::Publish::VitePress`,
+`ASPEER::Markdown::Publish::Docusaurus`,
+`ASPEER::Markdown::Publish::Starlight`,
+`ASPEER::MakeMaker::Markdown::Publish`
 
 # AUTHOR
 
@@ -206,10 +153,6 @@ Andrew Speer <andrew.speer@isolutions.com.au>
 
 # LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish.
-
-This software is copyright (c) 2026 by Andrew Speer
-<andrew.speer@isolutions.com.au>.
-
-This is free software; you can redistribute it and/or modify it under the same
-terms as the Perl 5 programming language system itself.
+This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+Speer. This is free software; you can redistribute it and/or modify it under
+the same terms as Perl 5.

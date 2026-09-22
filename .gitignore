@@ -4,6 +4,8 @@ blib/
 pm_to_blib
 site/
 *.bak
+*.sha
+*.pm.local
 Markdown-MkDocs-*/
 Markdown-MkDocs-*.tar.gz
 ASPEER-Markdown-Publish-*/

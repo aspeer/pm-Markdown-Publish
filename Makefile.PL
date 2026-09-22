@@ -28,12 +28,13 @@ my %WriteMakefile=(
     DISTNAME         => 'ASPEER-Markdown-Publish',
     VERSION_FROM     => 'lib/ASPEER/Markdown/Publish.pm',
     ABSTRACT_FROM    => 'lib/ASPEER/Markdown/Publish.pm',
-    EXE_FILES        => ['bin/markdown-publish', 'bin/markdown-mkdocs'],
+    EXE_FILES        => ['bin/markdown-publish'],
     LICENSE          => 'perl',
     AUTHOR           => 'Andrew Speer <andrew.speer@isolutions.com.au>',
     MIN_PERL_VERSION => '5.008',
     PREREQ_PM        => {
         'Cwd'          => 0,
+        'Exporter'     => 0,
         'File::Copy'   => 0,
         'File::Find'   => 0,
         'File::Path'   => 0,
@@ -55,7 +56,17 @@ my %WriteMakefile=(
     },
     META_MERGE => {
         'meta-spec' => {version => 2},
+        prereqs     => {
+            configure => {
+                suggests => {
+                    'ASPEER::MakeMaker::Markdown::Pod' => '0.012',
+                },
+            },
+        },
         resources   => {
+            bugtracker => {
+                web => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish/issues',
+            },
             homepage   => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish',
             repository => {
                 type => 'git',

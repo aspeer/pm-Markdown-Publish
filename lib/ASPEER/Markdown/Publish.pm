@@ -30,6 +30,7 @@ use File::Spec;
 use File::Temp qw(tempdir);
 use IPC::Run3 qw(run3);
 use JSON::PP qw(decode_json encode_json);
+use ASPEER::Markdown::Publish::Constant;
 
 
 #  Version information
@@ -38,10 +39,9 @@ $AUTHORITY='cpan:ASPEER';
 $VERSION='0.001';
 
 
-#  Supported publication backends and actions
+#  Supported publication actions
 #
-my %BACKEND=map {$_ => 1} qw(mkdocs vitepress docusaurus starlight);
-my %ACTION=map {$_ => 1} qw(build serve gh_publish gh_push);
+my %ACTION=map {$_ => 1} qw(build serve gh cloudflare);
 
 
 #  Done
@@ -57,6 +57,24 @@ sub new {
     $opt_hr={} unless defined($opt_hr);
     die "publication configuration must be a hash reference\n"
         unless ref($opt_hr) eq 'HASH';
+    if ($class eq __PACKAGE__) {
+        if (exists($opt_hr->{'config_file'})) {
+            die "config_file cannot be combined with inline publication settings\n"
+                unless keys(%{$opt_hr})==1;
+            return $class->load_config($opt_hr->{'config_file'});
+        }
+        my $module=defined($ENV{'MARKDOWN_PUBLISH_MODULE'}) ?
+            $ENV{'MARKDOWN_PUBLISH_MODULE'} :
+            (exists($opt_hr->{'module'}) ? $opt_hr->{'module'} : $MARKDOWN_PUBLISH_MODULE);
+        die "invalid publication module: $module\n"
+            unless defined($module) &&
+                $module=~/^ASPEER::Markdown::Publish::[A-Za-z][A-Za-z0-9_]*$/;
+        (my $module_fn=$module)=~s{::}{/}g;
+        require "$module_fn.pm";
+        die "$module is not an ASPEER::Markdown::Publish subclass\n"
+            unless $module->isa(__PACKAGE__);
+        return $module->new($opt_hr);
+    }
     my $self=bless({%{$opt_hr}}, $class);
     return $self;
 
@@ -91,36 +109,11 @@ sub load_config {
 }
 
 
-sub backend_config {
-
-    my ($self, $backend)=@_;
-    $self->validate_backend($backend);
-    my $config_hr=$self->{$backend};
-    return {} unless defined($config_hr);
-    die "$backend publication configuration must be a hash reference\n"
-        unless ref($config_hr) eq 'HASH';
-    return $config_hr;
-
-}
-
-
 sub option {
 
-    my ($self, $backend, $name, $default)=@_;
-    my $config_hr=$self->backend_config($backend);
-    return $config_hr->{$name} if exists($config_hr->{$name});
+    my ($self, $name, $default)=@_;
     return $self->{$name} if exists($self->{$name});
     return $default;
-
-}
-
-
-sub validate_backend {
-
-    my ($self, $backend)=@_;
-    die "unknown publication backend: $backend\n"
-        unless defined($backend) && $BACKEND{$backend};
-    return 1;
 
 }
 
@@ -137,13 +130,12 @@ sub validate_action {
 
 sub run {
 
-    my ($self, $backend, $action)=@_;
-    $self->validate_backend($backend);
+    my ($self, $action)=@_;
     $self->validate_action($action);
-    return $self->build($backend) if $action eq 'build';
-    return $self->serve($backend) if $action eq 'serve';
-    return $self->gh_publish($backend, 0) if $action eq 'gh_publish';
-    return $self->gh_publish($backend, 1);
+    return $self->build() if $action eq 'build';
+    return $self->serve() if $action eq 'serve';
+    return $self->publish_gh() if $action eq 'gh';
+    return $self->publish_cloudflare();
 
 }
 
@@ -258,19 +250,45 @@ sub target_filename {
 }
 
 
+sub copy_markdown_tree {
+
+    my ($self, $source_dn, $docs_dn)=@_;
+    return unless -d $source_dn;
+    File::Find::find({
+        no_chdir   => 1,
+        preprocess => sub {sort @_},
+        wanted     => sub {
+            my $fn=$File::Find::name;
+            return if -l $fn;
+            return unless -f $fn && $fn=~/\.md$/;
+            my $target_fn=File::Spec->catfile($source_dn,
+                File::Spec->abs2rel($fn, $source_dn));
+            my $output_fn=File::Spec->catfile($docs_dn, $target_fn);
+            die "publication page already exists: $target_fn\n" if -e $output_fn;
+            my (undef, $parent_dn)=File::Spec->splitpath($output_fn);
+            make_path($parent_dn);
+            copy($fn, $output_fn) || die "unable to copy $fn: $!\n";
+        }
+    }, $source_dn);
+    return 1;
+
+}
+
+
 sub prepare_docs {
 
 
-    #  Assemble only the configured source roots into a disposable tree.
-    #  Configuration directories and build products are not publication input.
+    #  Assemble the configured source roots and mirror lib/bin Markdown when
+    #  doc is selected. Keep all generated pages in the disposable tree.
     #
     my ($self)=@_;
     my $temporary_dn=abs_path(tempdir(CLEANUP => 1));
     my $docs_dn=File::Spec->catdir($temporary_dn, 'docs');
     make_path($docs_dn);
     my @pages;
+    my $source_dn_ar=$self->source_directories();
 
-    foreach my $source_dn (@{$self->source_directories()}) {
+    foreach my $source_dn (@{$source_dn_ar}) {
         die "publication source directory not found: $source_dn\n"
             unless -d $source_dn;
         File::Find::find({
@@ -310,14 +328,19 @@ sub prepare_docs {
     }
 
     die "no Markdown documents discovered in publication sources\n" unless @pages;
+    if (grep {$_ eq 'doc'} @{$source_dn_ar}) {
+        $self->copy_markdown_tree('lib', $docs_dn);
+        $self->copy_markdown_tree('bin', $docs_dn);
+    }
+    #  Keep a home page without placing its generated link list in navigation.
+    #
     unless (-f File::Spec->catfile($docs_dn, 'index.md')) {
         my $index="# Documentation\n\n";
         $index.="- [$_]($_)\n" foreach @pages;
         $self->write_file(File::Spec->catfile($docs_dn, 'index.md'), $index);
-        unshift(@pages, 'index.md');
     }
 
-    foreach my $source_dn (@{$self->source_directories()}) {
+    foreach my $source_dn (@{$source_dn_ar}) {
         $self->copy_tree(File::Spec->catdir($source_dn, 'images'),
             File::Spec->catdir($docs_dn, 'images'));
         $self->copy_tree(File::Spec->catdir($source_dn, 'assets'),
@@ -396,74 +419,14 @@ sub split {
 }
 
 
-sub prepare_mkdocs {
-
-    my ($self, $preview)=@_;
-    my $config_fn=$self->option('mkdocs', 'config', undef);
-    $config_fn='mkdocs.yml' if !defined($config_fn) && -f 'mkdocs.yml';
-    if (defined($config_fn) && length($config_fn) &&
-        ($self->option('mkdocs', 'config_mode', '') eq 'direct' || $config_fn eq 'mkdocs.yml')) {
-        die "MkDocs configuration not found: $config_fn\n" unless -f $config_fn;
-        return abs_path($config_fn);
-    }
-    $config_fn='doc/mkdocs/mkdocs.yml'
-        if !defined($config_fn) && -f 'doc/mkdocs/mkdocs.yml';
-
-    my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
-    my $generated_fn=File::Spec->catfile($temporary_dn, 'mkdocs.yml');
-    my $output_dn=File::Spec->rel2abs($self->option('mkdocs', 'output', 'site'));
-    my $config='';
-    if (defined($config_fn) && length($config_fn)) {
-        die "MkDocs configuration not found: $config_fn\n" unless -f $config_fn;
-        $config.='INHERIT: '.encode_json(abs_path($config_fn))."\n";
-    }
-    else {
-        $config.='site_name: '.encode_json($self->option('mkdocs', 'name', 'Documentation'))."\n";
-        $config.="theme:\n  name: material\n";
-        $config.="markdown_extensions:\n  - admonition\n  - attr_list\n  - def_list\n  - footnotes\n  - tables\n  - pymdownx.superfences\n";
-    }
-    $config.='docs_dir: '.encode_json(abs_path($docs_dn))."\n";
-    $config.='site_dir: '.encode_json($output_dn)."\n";
-    $config.="plugins:\n  - search\n" if $preview;
-    $config.="nav:\n";
-    $config.='  - '.encode_json($_)."\n" foreach @{$pages_ar};
-    $self->write_file($generated_fn, $config);
-    return $generated_fn;
-
-}
-
-
 sub normalize_node_admonitions {
 
-    my ($self, $markdown, $type)=@_;
-    my %map=(
-        vitepress => {
-            note      => 'info',
-            tip       => 'tip',
-            warning   => 'warning',
-            important => 'warning',
-            caution   => 'warning'
-        },
-        docusaurus => {
-            note      => 'note',
-            tip       => 'tip',
-            warning   => 'warning',
-            important => 'warning',
-            caution   => 'caution'
-        },
-        starlight => {
-            note      => 'note',
-            tip       => 'tip',
-            warning   => 'caution',
-            important => 'caution',
-            caution   => 'caution'
-        }
-    );
+    my ($self, $markdown)=@_;
     my @output;
     my @line=split(/(?<=\n)/, $markdown);
     for (my $index=0; $index<@line; $index++) {
         if ($line[$index]=~/^!!!\s+(\w+).*?\n?$/) {
-            my $kind=$map{$type}{$1} || $1;
+            my $kind=$self->admonition_type($1);
             push(@output, ":::$kind\n");
             while ($index + 1 < @line && $line[$index + 1]=~/^(?:    |\s*$)/) {
                 $index++;
@@ -477,6 +440,14 @@ sub normalize_node_admonitions {
         push(@output, $line[$index]);
     }
     return join('', @output);
+
+}
+
+
+sub admonition_type {
+
+    my ($self, $kind)=@_;
+    return $kind;
 
 }
 
@@ -521,7 +492,7 @@ sub normalize_node_definition_lists {
 
 sub normalize_node_attributes {
 
-    my ($self, $markdown, $type)=@_;
+    my ($self, $markdown)=@_;
     my @output;
     my ($fence, $length)=('', 0);
     foreach my $line (split(/(?<=\n)/, $markdown)) {
@@ -556,7 +527,7 @@ sub normalize_node_attributes {
         #  Docusaurus and Starlight do not accept Pandoc heading attributes.
         #  A raw anchor preserves the stable identifiers used by split links.
         #
-        if (($type eq 'docusaurus' || $type eq 'starlight') &&
+        if ($self->heading_anchor_required() &&
             $line=~/^( {0,3})(#{1,6}[^\r\n]*?)\s+\{#([\w.-]+)(?:\s+[^}]*)?\}[ \t]*(\r?\n)?$/) {
             push(@output, "$1<a id=\"$3\"></a>".($4 || '').$1.$2.($4 || ''));
             next;
@@ -573,51 +544,13 @@ sub normalize_node_attributes {
 }
 
 
-sub starlight_title_heading {
+sub heading_anchor_required {
 
-    my ($self, $markdown)=@_;
-    my @output;
-    my ($fence, $length, $frontmatter, $removed)=('', 0, 0, 0);
-    my $index=0;
-    foreach my $line (split(/(?<=\n)/, $markdown)) {
-        if (!$index && $line=~/^---[ \t]*\r?\n?$/) {
-            $frontmatter=1;
-            push(@output, $line);
-            $index++;
-            next;
-        }
-        if ($frontmatter) {
-            $frontmatter=0 if $line=~/^---[ \t]*\r?\n?$/;
-            push(@output, $line);
-            $index++;
-            next;
-        }
-        if (!$fence && $line=~/^ {0,3}(`{3,}|~{3,})/) {
-            $fence=substr($1, 0, 1);
-            $length=length($1);
-        }
-        elsif ($fence && $line=~/^ {0,3}\Q$fence\E{$length,}\s*$/) {
-            $fence='';
-        }
-        elsif (!$fence && !$removed && $line=~/^#\s+(.+?)[ \t]*(\r?\n)?$/) {
-            my ($title, $newline)=($1, $2 || '');
-            my ($id)=$title=~/\s+\{#([\w.-]+)(?:\s+[^}]*)?\}\s*$/;
-            unless (defined($id)) {
-                $id=lc($title);
-                $id=~s/[^a-z0-9]+/-/g;
-                $id=~s/^-|-$//g;
-            }
-            push(@output, "<a id=\"$id\"></a>$newline") if length($id);
-            $removed=1;
-            $index++;
-            next;
-        }
-        push(@output, $line);
-        $index++;
-    }
-    return join('', @output);
+    return 0;
 
 }
+
+
 
 
 sub markdown_title {
@@ -715,7 +648,7 @@ sub navigation {
 
 sub normalize_node_markdown {
 
-    my ($self, $source_dn, $type)=@_;
+    my ($self, $source_dn)=@_;
     File::Find::find({
         no_chdir => 1,
         wanted   => sub {
@@ -726,12 +659,9 @@ sub normalize_node_markdown {
             my $markdown=<$input_fh>;
             close($input_fh) || die "unable to close $fn: $!\n";
             $markdown=$self->normalize_node_definition_lists($markdown);
-            $markdown=$self->title_frontmatter($fn, $markdown)
-                if $type eq 'docusaurus' || $type eq 'starlight';
-            $markdown=$self->starlight_title_heading($markdown)
-                if $type eq 'starlight';
-            $markdown=$self->normalize_node_attributes($markdown, $type);
-            $markdown=$self->normalize_node_admonitions($markdown, $type);
+            $markdown=$self->normalize_backend_markdown($fn, $markdown);
+            $markdown=$self->normalize_node_attributes($markdown);
+            $markdown=$self->normalize_node_admonitions($markdown);
             $self->write_file($fn, $markdown);
         }
     }, $source_dn);
@@ -740,146 +670,18 @@ sub normalize_node_markdown {
 }
 
 
-sub prepare_vitepress {
+sub normalize_backend_markdown {
 
-    my ($self)=@_;
-    my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
-    my $navigation_ar=$self->navigation($docs_dn, $pages_ar);
-    $self->normalize_node_markdown($docs_dn, 'vitepress');
-    my $version=$self->option('vitepress', 'version', 'latest');
-    my $package_hr={
-        type         => 'module',
-        dependencies => {vitepress => $version}
-    };
-    $self->write_file(File::Spec->catfile($temporary_dn, 'package.json'),
-        encode_json($package_hr));
-    my $config_dn=File::Spec->catdir($docs_dn, '.vitepress');
-    make_path($config_dn);
-    my $config_fn=$self->option('vitepress', 'config', undef);
-    my $prepared_config_fn;
-    if (defined($config_fn) && length($config_fn)) {
-        die "VitePress configuration not found: $config_fn\n" unless -f $config_fn;
-        $prepared_config_fn=abs_path($config_fn);
-    }
-    else {
-        my @items=map {
-            my $link=$_->{'id'} eq 'index' ? '/' : '/'.$_->{'id'};
-            "          { text: ".encode_json($_->{'title'}).
-                ", link: ".encode_json($link)." }"
-        } @{$navigation_ar};
-        my $config="export default {\n  title: ".
-            encode_json($self->option('vitepress', 'name', 'Documentation')).
-            ",\n  themeConfig: {\n    sidebar: [\n".
-            join(",\n", @items)."\n    ]\n  }\n};\n";
-        $prepared_config_fn=File::Spec->catfile($config_dn, 'config.mts');
-        $self->write_file($prepared_config_fn, $config);
-    }
-    return ($temporary_dn, $docs_dn, $prepared_config_fn);
-
-}
-
-
-sub prepare_docusaurus {
-
-    my ($self)=@_;
-    my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
-    my $navigation_ar=$self->navigation($docs_dn, $pages_ar);
-    my $site_dn=File::Spec->catdir($temporary_dn, 'docusaurus');
-    my $site_docs_dn=File::Spec->catdir($site_dn, 'docs');
-    make_path($site_docs_dn);
-    $self->copy_tree($docs_dn, $site_docs_dn);
-    $self->normalize_node_markdown($site_docs_dn, 'docusaurus');
-    my @items=map {{
-        type  => 'doc',
-        id    => $_->{'id'},
-        label => $_->{'title'}
-    }} @{$navigation_ar};
-    my $version=$self->option('docusaurus', 'version', 'latest');
-    my $package_hr={
-        scripts      => {
-            build => 'docusaurus build',
-            start => 'docusaurus start --no-open'
-        },
-        dependencies => {
-            '@docusaurus/core'           => $version,
-            '@docusaurus/preset-classic' => $version
-        }
-    };
-    $self->write_file(File::Spec->catfile($site_dn, 'package.json'), encode_json($package_hr));
-    my $config_fn=$self->option('docusaurus', 'config', undef);
-    my $prepared_config_fn;
-    if (defined($config_fn) && length($config_fn)) {
-        die "Docusaurus configuration not found: $config_fn\n" unless -f $config_fn;
-        $prepared_config_fn=abs_path($config_fn);
-    }
-    else {
-        my $config="module.exports = {\n  title: ".
-            encode_json($self->option('docusaurus', 'name', 'Documentation')).
-            ",\n  url: 'http://localhost',\n  baseUrl: '/',\n  onBrokenLinks: 'warn',\n".
-            "  markdown: { format: 'detect' },\n".
-            "  presets: [['classic', { docs: { routeBasePath: '/', sidebarPath: require.resolve('./sidebars.js') }, blog: false }]],\n};\n";
-        $prepared_config_fn=File::Spec->catfile($site_dn, 'docusaurus.config.js');
-        $self->write_file($prepared_config_fn, $config);
-    }
-    $self->write_file(File::Spec->catfile($site_dn, 'sidebars.js'),
-        "module.exports = { docs: ".encode_json(\@items)." };\n");
-    return ($temporary_dn, $site_dn, $prepared_config_fn);
-
-}
-
-
-sub prepare_starlight {
-
-    my ($self)=@_;
-    my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
-    my $navigation_ar=$self->navigation($docs_dn, $pages_ar);
-    my $site_dn=File::Spec->catdir($temporary_dn, 'starlight');
-    my $site_docs_dn=File::Spec->catdir($site_dn, 'src', 'content', 'docs');
-    make_path($site_docs_dn);
-    $self->copy_tree($docs_dn, $site_docs_dn);
-    $self->normalize_node_markdown($site_docs_dn, 'starlight');
-    my $astro_version=$self->option('starlight', 'astro_version', 'latest');
-    my $starlight_version=$self->option('starlight', 'starlight_version', 'latest');
-    my $package_hr={
-        type         => 'module',
-        scripts      => {build => 'astro build', start => 'astro dev'},
-        dependencies => {astro => $astro_version, '@astrojs/starlight' => $starlight_version}
-    };
-    $self->write_file(File::Spec->catfile($site_dn, 'package.json'), encode_json($package_hr));
-    my $config_fn=$self->option('starlight', 'config', undef);
-    my $prepared_config_fn;
-    if (defined($config_fn) && length($config_fn)) {
-        die "Starlight configuration not found: $config_fn\n" unless -f $config_fn;
-        $prepared_config_fn=abs_path($config_fn);
-    }
-    else {
-        my @items=map {
-            "      { label: ".encode_json($_->{'title'}).
-                ", slug: ".encode_json($_->{'id'})." }"
-        } @{$navigation_ar};
-        my $config="import { defineConfig } from 'astro/config';\n".
-            "import starlight from '\@astrojs/starlight';\n\n".
-            "export default defineConfig({\n  integrations: [starlight({\n    title: ".
-            encode_json($self->option('starlight', 'name', 'Documentation')).
-            ",\n    sidebar: [{ label: 'Docs', items: [\n".
-            join(",\n", @items)."\n    ] }]\n  })]\n});\n";
-        $prepared_config_fn=File::Spec->catfile($site_dn, 'astro.config.mjs');
-        $self->write_file($prepared_config_fn, $config);
-    }
-    $self->write_file(File::Spec->catfile($site_dn, 'src', 'content.config.ts'),
-        "import { defineCollection } from 'astro:content';\n".
-        "import { glob } from 'astro/loaders';\n".
-        "import { docsSchema } from '\@astrojs/starlight/schema';\n\n".
-        "export const collections = { docs: defineCollection({ loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/docs' }), schema: docsSchema() }) };\n");
-    return ($temporary_dn, $site_dn, $prepared_config_fn);
+    my ($self, $fn, $markdown)=@_;
+    return $markdown;
 
 }
 
 
 sub npm_install {
 
-    my ($self, $backend, $site_dn)=@_;
-    my $npm=$self->option($backend, 'npm', 'npm');
+    my ($self, $site_dn)=@_;
+    my $npm=$self->option('npm', 'npm');
     $self->system_in_dir($site_dn, $npm, 'install', '--silent');
     return 1;
 
@@ -888,96 +690,29 @@ sub npm_install {
 
 sub build {
 
-    my ($self, $backend)=@_;
-    $self->validate_backend($backend);
-    my $output_dn=File::Spec->rel2abs($self->option($backend, 'output', 'site'));
-    if ($backend eq 'mkdocs') {
-        my $config_fn=$self->prepare_mkdocs(0);
-        my @command=($self->option('mkdocs', 'command', 'mkdocs'), 'build');
-        push(@command, '--strict') if $self->option('mkdocs', 'strict', 1);
-        push(@command, '-f', $config_fn, '--site-dir', $output_dn);
-        $self->command(@command);
-    }
-    elsif ($backend eq 'vitepress') {
-        my ($temporary_dn, $docs_dn, $config_fn)=$self->prepare_vitepress();
-        $self->npm_install('vitepress', $temporary_dn);
-        $self->system_in_dir($temporary_dn, $self->option('vitepress', 'npm', 'npm'),
-            'exec', '--', 'vitepress', 'build', $docs_dn, '--config', $config_fn,
-            '--outDir', $output_dn);
-    }
-    elsif ($backend eq 'docusaurus') {
-        my (undef, $site_dn, $config_fn)=$self->prepare_docusaurus();
-        $self->npm_install('docusaurus', $site_dn);
-        $self->system_in_dir($site_dn, $self->option('docusaurus', 'npm', 'npm'),
-            'run', 'build', '--', '--config', $config_fn, '--out-dir', $output_dn);
-    }
-    else {
-        my (undef, $site_dn, $config_fn)=$self->prepare_starlight();
-        my $config_arg=File::Spec->abs2rel($config_fn, $site_dn);
-        $config_arg=$config_fn if $config_arg=~m{^\.\.[/\\]};
-        $self->npm_install('starlight', $site_dn);
-        $self->system_in_dir($site_dn, $self->option('starlight', 'npm', 'npm'),
-            'run', 'build', '--', '--config', $config_arg, '--outDir', $output_dn);
-    }
-    return $output_dn;
+    die "publication backend must implement build()\n";
 
 }
 
 
 sub serve {
 
-    my ($self, $backend)=@_;
-    $self->validate_backend($backend);
-    if ($backend eq 'mkdocs') {
-        my $config_fn=$self->prepare_mkdocs(1);
-        my @command=($self->option('mkdocs', 'command', 'mkdocs'), 'serve', '-f', $config_fn);
-        my $address=$self->option('mkdocs', 'address', undef);
-        push(@command, '-a', $address) if defined($address) && length($address);
-        $self->system_command(@command);
-    }
-    elsif ($backend eq 'vitepress') {
-        my ($temporary_dn, $docs_dn, $config_fn)=$self->prepare_vitepress();
-        $self->npm_install('vitepress', $temporary_dn);
-        $self->system_in_dir($temporary_dn, $self->option('vitepress', 'npm', 'npm'),
-            'exec', '--', 'vitepress', 'dev', $docs_dn, '--config', $config_fn,
-            '--host', $self->option('vitepress', 'host', '127.0.0.1'),
-            '--port', $self->option('vitepress', 'port', 5173));
-    }
-    elsif ($backend eq 'docusaurus') {
-        my (undef, $site_dn, $config_fn)=$self->prepare_docusaurus();
-        $self->npm_install('docusaurus', $site_dn);
-        $self->system_in_dir($site_dn, $self->option('docusaurus', 'npm', 'npm'),
-            'run', 'start', '--', '--config', $config_fn,
-            '--host', $self->option('docusaurus', 'host', '127.0.0.1'),
-            '--port', $self->option('docusaurus', 'port', 3001));
-    }
-    else {
-        my (undef, $site_dn, $config_fn)=$self->prepare_starlight();
-        my $config_arg=File::Spec->abs2rel($config_fn, $site_dn);
-        $config_arg=$config_fn if $config_arg=~m{^\.\.[/\\]};
-        $self->npm_install('starlight', $site_dn);
-        local $ENV{'ASTRO_DEV_BACKGROUND'}=0;
-        $self->system_in_dir($site_dn, $self->option('starlight', 'npm', 'npm'),
-            'run', 'start', '--', '--config', $config_arg,
-            '--host', $self->option('starlight', 'host', '127.0.0.1'),
-            '--port', $self->option('starlight', 'port', 4321));
-    }
-    return 1;
+    die "publication backend must implement serve()\n";
 
 }
 
 
-sub gh_publish {
+sub publish_gh {
 
 
     #  Build first, then replace only the disposable publication worktree.
-    #  A remote update is performed solely for the explicit gh_push action.
+    #  This action explicitly includes the remote push.
     #
-    my ($self, $backend, $push)=@_;
-    $self->validate_backend($backend);
-    my $site_dn=$self->build($backend);
-    my $branch=$self->option($backend, 'branch', 'gh-pages');
-    my $remote=$self->option($backend, 'remote', 'origin');
+    my ($self)=@_;
+    my $branch=$self->option('branch', $MARKDOWN_PUBLISH_BRANCH);
+    my $remote=$self->option('remote', $MARKDOWN_PUBLISH_REMOTE);
+    $self->command('git', 'remote', 'get-url', $remote);
+    my $site_dn=$self->build();
     $self->command('git', 'check-ref-format', '--branch', $branch);
     my $temporary_dn=abs_path(tempdir(CLEANUP => 1));
     my $work_dn=File::Spec->catdir($temporary_dn, 'pages');
@@ -1003,8 +738,37 @@ sub gh_publish {
     my $error=$@;
     $self->command('git', 'worktree', 'remove', '--force', $work_dn);
     die $error unless $ok;
-    $self->command('git', 'push', $remote, $branch) if $push;
+    $self->command('git', 'push', $remote, $branch);
     return $branch;
+
+}
+
+
+sub publish_cloudflare {
+
+
+    #  The site generator owns the build; Wrangler deploys only the resulting
+    #  static assets using an explicitly selected Worker configuration.
+    #
+    my ($self)=@_;
+    my $cloudflare_hr=$self->{'cloudflare'};
+    die "cloudflare publication configuration must be a hash reference\n"
+        unless ref($cloudflare_hr) eq 'HASH';
+    my $config_fn=$cloudflare_hr->{'config'} ||
+        die "cloudflare publication requires a Wrangler configuration file\n";
+    die "Wrangler configuration not found: $config_fn\n" unless -f $config_fn;
+    $config_fn=abs_path($config_fn);
+    my $wrangler=$cloudflare_hr->{'wrangler'} || 'wrangler';
+
+    my $site_dn=$self->build();
+    die "built site directory not found: $site_dn\n" unless -d $site_dn;
+    $site_dn=abs_path($site_dn);
+    my @command=($wrangler, 'deploy', '--config', $config_fn,
+        '--assets', $site_dn);
+    push(@command, '--env', $cloudflare_hr->{'environment'})
+        if defined($cloudflare_hr->{'environment'}) && length($cloudflare_hr->{'environment'});
+    $self->system_command(@command);
+    return $site_dn;
 
 }
 
@@ -1015,7 +779,7 @@ __END__
 
 # NAME
 
-ASPEER::Markdown::Publish - publish Perl distribution documentation with multiple site generators
+ASPEER::Markdown::Publish - common documentation publication operations
 
 # SYNOPSIS
 
@@ -1023,197 +787,144 @@ ASPEER::Markdown::Publish - publish Perl distribution documentation with multipl
 use ASPEER::Markdown::Publish;
 
 my $publish_or=ASPEER::Markdown::Publish->new({
+    module  => 'ASPEER::Markdown::Publish::MkDocs',
     sources => ['doc'],
-    mkdocs  => {
-        config => 'doc/mkdocs/mkdocs.yml',
-        output => 'site',
-    },
+    config  => 'doc/mkdocs/mkdocs.yml',
 });
 
-$publish_or->run('mkdocs', 'build');
-$publish_or->run('mkdocs', 'serve');
-$publish_or->run('mkdocs', 'gh_publish');
+$publish_or->run('build');
+$publish_or->run('serve');
+$publish_or->run('gh');
+$publish_or->run('cloudflare');
 ```
 
 # DESCRIPTION
 
-`ASPEER::Markdown::Publish` assembles Markdown documentation from a Perl
-distribution and delegates rendering to MkDocs, VitePress, Docusaurus, or
-Astro Starlight. It has no MakeMaker dependency. The companion
-`ASPEER::MakeMaker::Markdown::Publish` module supplies Makefile targets and
-passes `META_MERGE.x_documentation.publish` configuration to this module.
+This module selects one publishing engine and provides the shared operations
+for assembling Markdown, splitting chapters, normalising links and assets,
+and publishing a built site through a temporary Git worktree. The engine
+classes implement their own `prepare`, `build`, and `serve` methods. No
+Makefile is needed; `ASPEER::MakeMaker::Markdown::Publish` supplies optional
+MakeMaker targets.
 
-When `sources` is omitted, an existing `doc/` directory is the publication
-boundary. If `doc/` does not exist, `lib/` and `bin/` Markdown sidecars are used
-as a compatibility fallback. An existing but empty `doc/` directory does not
-fall back. An explicit source list is exact:
-
-```perl
-sources => [qw(doc lib bin)]
-```
-
-Multiple top-level headings in documents beneath `doc/` are split into stable
-pages. Explicit anchors and links between split chapters are preserved.
-For the Node-backed generators, Pandoc definition lists and attribute syntax
-are converted to portable Markdown and HTML equivalents in the disposable
-publication tree. Authored source documents are not changed.
+An existing `doc/` directory is the default publication boundary. When it is
+assembled, Markdown beneath `lib/` and `bin/` is mirrored under those paths in
+the temporary site documents. A guide can link to `lib/Example/Module.pm.md`.
+Mirrored pages are available through links but are not added to generated
+navigation. When `doc/` is absent, sidecars become the default source pages.
+Set `sources` explicitly to include other directories. Source files are never rewritten;
+assembly and engine-specific Markdown adjustments happen in temporary trees.
 
 # CONFIGURATION
 
-Common settings may be placed directly in the constructor hash. A backend hash
-overrides the corresponding common value:
+The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
+with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
+when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
+rather than nested beneath engine names:
 
 ```perl
 {
+    module  => 'ASPEER::Markdown::Publish::Docusaurus',
     sources => ['doc'],
     name    => 'Example documentation',
+    config  => 'doc/docusaurus/docusaurus.config.js',
     output  => 'site',
     branch  => 'gh-pages',
-    remote  => 'origin',
-
-    mkdocs => {
-        config      => 'doc/mkdocs/mkdocs.yml',
-        config_mode => 'inherit',
-        command     => 'mkdocs',
-        strict      => 1,
-        address     => '127.0.0.1:8000',
-    },
-
-    vitepress => {
-        config => 'doc/vitepress/config.mts',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 5173,
-        version => 'latest',
-    },
-
-    docusaurus => {
-        config => 'doc/docusaurus/docusaurus.config.js',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 3001,
-        version => 'latest',
-    },
-
-    starlight => {
-        config => 'doc/starlight/astro.config.mjs',
-        npm    => 'npm',
-        host   => '127.0.0.1',
-        port   => 4321,
-        astro_version     => 'latest',
-        starlight_version => 'latest',
-    },
+    remote  => 'github',
+    cloudflare => {config => 'wrangler.jsonc'},
 }
 ```
 
-A root `mkdocs.yml` is used directly because it owns its complete source-tree
-layout. Other MkDocs configuration paths are inherited by a temporary child
-configuration which supplies the assembled documentation, navigation, and
-output directory. Set `config_mode` to `direct` when a non-root configuration
-also owns its complete layout.
+The `config` path and other engine-specific options are described by the
+selected engine module. `load_config($filename)` accepts a JSON object
+containing the settings directly, under `publish`, or under
+`x_documentation.publish`. `new({config_file => $filename})` is equivalent.
+Do not combine `config_file` with inline settings.
 
-`load_config($filename)` reads JSON in any of these forms:
+For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
-```json
-{"sources":["doc"]}
+```jsonc
+{
+    "name": "example-docs",
+    "compatibility_date": "2026-09-22",
+    "assets": {
+        "directory": "./site",
+        "not_found_handling": "404-page"
+    },
+    "observability": {
+        "enabled": true,
+        "traces": {"enabled": true}
+    }
+}
 ```
 
-```json
-{"publish":{"sources":["doc"]}}
-```
-
-```json
-{"x_documentation":{"publish":{"sources":["doc"]}}}
-```
+Use the current compatibility date for a new Worker and choose the intended
+Worker name. The deploy action replaces `assets.directory` with the selected
+engine's actual build output; the authored file remains unchanged.
 
 # METHODS
 
 ## new
 
-Creates a publisher from a configuration hash reference.
+Loads and constructs the selected engine class. A direct engine-class
+constructor may be used when the class is already known.
 
 ## load_config
 
-Creates a publisher from a standalone JSON file.
+Reads a JSON configuration and constructs its selected engine.
 
 ## run
 
-```perl
-$publish_or->run($backend, $action);
-```
-
-Supported backends are `mkdocs`, `vitepress`, `docusaurus`, and `starlight`.
-Supported actions are:
-
-- `build`: render the static site.
-- `serve`: run the backend's foreground preview server.
-- `gh_publish`: build and commit the result to a local publication branch.
-- `gh_push`: perform `gh_publish`, then push the selected branch to the selected
-  remote.
-
-Remote publication is never implicit.
+Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
+site, updates the local publication branch, then pushes that branch to the
+configured remote. It defaults to a remote named `github` and fails if that
+remote does not exist. It is an explicit publishing action, not part of
+`build` or `serve`. `cloudflare` builds and deploys the static files to a
+Cloudflare Worker without committing or pushing Git.
 
 ## source_directories
 
-Returns the exact configured publication roots or the default roots selected by
-the `doc/` boundary rule.
+Returns the configured source roots or the default roots described above.
 
 ## prepare_docs
 
-Assembles source Markdown and assets in a temporary directory. It returns the
-temporary root, assembled documentation directory, and ordered page list.
+Assembles source Markdown and assets in a temporary directory. Returns the
+temporary root, assembled document directory, and ordered pages.
 
 ## split
 
-Splits a Markdown guide at top-level ATX headings, ignoring fenced examples,
-and repairs links to explicit anchors moved to another generated page.
+Splits a guide at top-level headings outside code fences and repairs links to
+anchors moved into another generated page.
 
-## prepare_mkdocs
+## publish_gh
 
-Returns a MkDocs configuration filename, generating a temporary configuration
-when assembly or inheritance is required.
+Builds, commits to a temporary worktree for the configured branch, and pushes
+that branch to the configured GitHub remote. It does not change the current
+checkout or force-push.
 
-## prepare_vitepress
+## publish_cloudflare
 
-Returns a temporary root, prepared VitePress documentation directory, and
-configuration filename. An authored configuration remains at its original
-location so its relative imports continue to resolve correctly. Generated
-navigation uses each page's authored title and preserves source order.
+Builds through the selected engine, then deploys that output as Workers Static
+Assets using Wrangler. Set `cloudflare.config` to an existing, dedicated
+Wrangler configuration file for the intended Worker. `cloudflare.wrangler`
+selects the executable (`wrangler` by default); `cloudflare.environment`
+optionally selects an authored Wrangler environment. The site directory is
+passed with `--assets`, overriding the config file's asset directory. Missing
+configuration or build output is fatal before deployment. Authentication
+comes from Wrangler's existing login or environment, not publication metadata.
 
-## prepare_docusaurus
-
-Returns a temporary root, prepared Docusaurus project directory, and
-configuration filename. Generated pages receive explicit title frontmatter and
-the sidebar preserves authored titles and source order.
-
-## prepare_starlight
-
-Returns a temporary root, prepared Astro Starlight project directory, and
-configuration filename. Generated navigation lists every page explicitly so
-root documents retain their authored titles and source order.
-
-## build
-
-Builds one supported backend and returns the absolute output directory.
-
-## serve
-
-Starts one supported backend's foreground development server.
-
-## gh_publish
-
-Builds a backend, updates a local publication branch through a temporary Git
-worktree, and optionally pushes when its second argument is true. Callers should
-normally use `run()` so local publication and explicit push remain distinct.
-
-# ERRORS
-
-Invalid configuration, missing source/configuration files, failed external
-commands, unsafe chapter identifiers, and Git failures are fatal.
+The Wrangler config owns the Worker name, compatibility date, routing, and
+other deployment settings. Use a static-assets-only config without a `main`
+script for this documentation workflow. Publishing to an existing Worker can
+update its settings; review its config before invoking this remote action.
 
 # SEE ALSO
 
-`ASPEER::MakeMaker::Markdown::Publish`, `ASPEER::MakeMaker::Markdown::Pod`
+`ASPEER::Markdown::Publish::MkDocs`,
+`ASPEER::Markdown::Publish::VitePress`,
+`ASPEER::Markdown::Publish::Docusaurus`,
+`ASPEER::Markdown::Publish::Starlight`,
+`ASPEER::MakeMaker::Markdown::Publish`
 
 # AUTHOR
 
@@ -1221,20 +932,16 @@ Andrew Speer <andrew.speer@isolutions.com.au>
 
 # LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish.
-
-This software is copyright (c) 2026 by Andrew Speer
-<andrew.speer@isolutions.com.au>.
-
-This is free software; you can redistribute it and/or modify it under the same
-terms as the Perl 5 programming language system itself.
+This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+Speer. This is free software; you can redistribute it and/or modify it under
+the same terms as Perl 5.
 
 =end markdown
 
 
 =head1 NAME
 
-ASPEER::Markdown::Publish - publish Perl distribution documentation with multiple site generators
+ASPEER::Markdown::Publish - common documentation publication operations
 
 
 =head1 SYNOPSIS
@@ -1243,220 +950,151 @@ ASPEER::Markdown::Publish - publish Perl distribution documentation with multipl
  use ASPEER::Markdown::Publish;
 
  my $publish_or=ASPEER::Markdown::Publish->new({
+     module  => 'ASPEER::Markdown::Publish::MkDocs',
      sources => ['doc'],
-     mkdocs  => {
-         config => 'doc/mkdocs/mkdocs.yml',
-         output => 'site',
-     },
+     config  => 'doc/mkdocs/mkdocs.yml',
  });
 
- $publish_or->run('mkdocs', 'build');
- $publish_or->run('mkdocs', 'serve');
- $publish_or->run('mkdocs', 'gh_publish');
+ $publish_or->run('build');
+ $publish_or->run('serve');
+ $publish_or->run('gh');
+ $publish_or->run('cloudflare');
 
 =head1 DESCRIPTION
 
-C<ASPEER::Markdown::Publish> assembles Markdown documentation from a Perl
-distribution and delegates rendering to MkDocs, VitePress, Docusaurus, or
-Astro Starlight. It has no MakeMaker dependency. The companion
-C<ASPEER::MakeMaker::Markdown::Publish> module supplies Makefile targets and
-passes C<META_MERGE.x_documentation.publish> configuration to this module.
+This module selects one publishing engine and provides the shared operations
+for assembling Markdown, splitting chapters, normalising links and assets,
+and publishing a built site through a temporary Git worktree. The engine
+classes implement their own C<prepare>, C<build>, and C<serve> methods. No
+Makefile is needed; C<ASPEER::MakeMaker::Markdown::Publish> supplies optional
+MakeMaker targets.
 
-When C<sources> is omitted, an existing C<doc/> directory is the publication
-boundary. If C<doc/> does not exist, C<lib/> and C<bin/> Markdown sidecars are used
-as a compatibility fallback. An existing but empty C<doc/> directory does not
-fall back. An explicit source list is exact:
-
-
- sources => [qw(doc lib bin)]
-Multiple top-level headings in documents beneath C<doc/> are split into stable
-pages. Explicit anchors and links between split chapters are preserved.
-For the Node-backed generators, Pandoc definition lists and attribute syntax
-are converted to portable Markdown and HTML equivalents in the disposable
-publication tree. Authored source documents are not changed.
+An existing C<doc/> directory is the default publication boundary. When it is
+assembled, Markdown beneath C<lib/> and C<bin/> is mirrored under those paths
+in the temporary site documents. A guide can link to
+C<lib/Example/Module.pm.md>. Mirrored pages are available through links but are
+not added to generated navigation. When C<doc/> is absent, sidecars become the
+default source pages. Set C<sources> explicitly to include other directories. Source
+files are never rewritten; assembly and engine-specific Markdown adjustments
+happen in temporary trees.
 
 
 =head1 CONFIGURATION
 
-Common settings may be placed directly in the constructor hash. A backend hash
-overrides the corresponding common value:
+The default engine is C<ASPEER::Markdown::Publish::MkDocs>. Select another class
+with C<module>. C<MARKDOWN_PUBLISH_MODULE> overrides C<module>, including
+when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
+rather than nested beneath engine names:
 
 
  {
+     module  => 'ASPEER::Markdown::Publish::Docusaurus',
      sources => ['doc'],
      name    => 'Example documentation',
+     config  => 'doc/docusaurus/docusaurus.config.js',
      output  => 'site',
      branch  => 'gh-pages',
-     remote  => 'origin',
-
-     mkdocs => {
-         config      => 'doc/mkdocs/mkdocs.yml',
-         config_mode => 'inherit',
-         command     => 'mkdocs',
-         strict      => 1,
-         address     => '127.0.0.1:8000',
-     },
-
-     vitepress => {
-         config => 'doc/vitepress/config.mts',
-         npm    => 'npm',
-         host   => '127.0.0.1',
-         port   => 5173,
-         version => 'latest',
-     },
-
-     docusaurus => {
-         config => 'doc/docusaurus/docusaurus.config.js',
-         npm    => 'npm',
-         host   => '127.0.0.1',
-         port   => 3001,
-         version => 'latest',
-     },
-
-     starlight => {
-         config => 'doc/starlight/astro.config.mjs',
-         npm    => 'npm',
-         host   => '127.0.0.1',
-         port   => 4321,
-         astro_version     => 'latest',
-         starlight_version => 'latest',
-     },
+     remote  => 'github',
+     cloudflare => {config => 'wrangler.jsonc'},
  }
-A root C<mkdocs.yml> is used directly because it owns its complete source-tree
-layout. Other MkDocs configuration paths are inherited by a temporary child
-configuration which supplies the assembled documentation, navigation, and
-output directory. Set C<config_mode> to C<direct> when a non-root configuration
-also owns its complete layout.
+The C<config> path and other engine-specific options are described by the
+selected engine module. C<load_config($filename)> accepts a JSON object
+containing the settings directly, under C<publish>, or under
+C<x_documentation.publish>. C<<< new({config_file => $filename}) >>> is equivalent.
+Do not combine C<config_file> with inline settings.
 
-C<load_config($filename)> reads JSON in any of these forms:
+For a static documentation Worker, a minimal authored C<wrangler.jsonc> is:
 
 
- {"sources":["doc"]}
+ {
+     "name": "example-docs",
+     "compatibility_date": "2026-09-22",
+     "assets": {
+         "directory": "./site",
+         "not_found_handling": "404-page"
+     },
+     "observability": {
+         "enabled": true,
+         "traces": {"enabled": true}
+     }
+ }
+Use the current compatibility date for a new Worker and choose the intended
+Worker name. The deploy action replaces C<assets.directory> with the selected
+engine's actual build output; the authored file remains unchanged.
 
- {"publish":{"sources":["doc"]}}
-
- {"x_documentation":{"publish":{"sources":["doc"]}}}
 
 =head1 METHODS
 
 
 =head2 new
 
-Creates a publisher from a configuration hash reference.
+Loads and constructs the selected engine class. A direct engine-class
+constructor may be used when the class is already known.
 
 
 =head2 load_config
 
-Creates a publisher from a standalone JSON file.
+Reads a JSON configuration and constructs its selected engine.
 
 
 =head2 run
 
-
- $publish_or->run($backend, $action);
-Supported backends are C<mkdocs>, C<vitepress>, C<docusaurus>, and C<starlight>.
-Supported actions are:
-
-=over
-
-=item -
-
-C<build>: render the static site.
-
-
-=item -
-
-C<serve>: run the backend's foreground preview server.
-
-
-=item -
-
-C<gh_publish>: build and commit the result to a local publication branch.
-
-
-=item -
-
-C<gh_push>: perform C<gh_publish>, then push the selected branch to the selected
-  remote.
-
-
-=back
-
-Remote publication is never implicit.
+Dispatches C<build>, C<serve>, C<gh>, or C<cloudflare>. C<gh> builds the
+site, updates the local publication branch, then pushes that branch to the
+configured remote. It defaults to a remote named C<github> and fails if that
+remote does not exist. It is an explicit publishing action, not part of
+C<build> or C<serve>. C<cloudflare> builds and deploys the static files to a
+Cloudflare Worker without committing or pushing Git.
 
 
 =head2 source_directories
 
-Returns the exact configured publication roots or the default roots selected by
-the C<doc/> boundary rule.
+Returns the configured source roots or the default roots described above.
 
 
 =head2 prepare_docs
 
-Assembles source Markdown and assets in a temporary directory. It returns the
-temporary root, assembled documentation directory, and ordered page list.
+Assembles source Markdown and assets in a temporary directory. Returns the
+temporary root, assembled document directory, and ordered pages.
 
 
 =head2 split
 
-Splits a Markdown guide at top-level ATX headings, ignoring fenced examples,
-and repairs links to explicit anchors moved to another generated page.
+Splits a guide at top-level headings outside code fences and repairs links to
+anchors moved into another generated page.
 
 
-=head2 prepare_mkdocs
+=head2 publish_gh
 
-Returns a MkDocs configuration filename, generating a temporary configuration
-when assembly or inheritance is required.
-
-
-=head2 prepare_vitepress
-
-Returns a temporary root, prepared VitePress documentation directory, and
-configuration filename. An authored configuration remains at its original
-location so its relative imports continue to resolve correctly. Generated
-navigation uses each page's authored title and preserves source order.
+Builds, commits to a temporary worktree for the configured branch, and pushes
+that branch to the configured GitHub remote. It does not change the current
+checkout or force-push.
 
 
-=head2 prepare_docusaurus
+=head2 publish_cloudflare
 
-Returns a temporary root, prepared Docusaurus project directory, and
-configuration filename. Generated pages receive explicit title frontmatter and
-the sidebar preserves authored titles and source order.
+Builds through the selected engine, then deploys that output as Workers Static
+Assets using Wrangler. Set C<cloudflare.config> to an existing, dedicated
+Wrangler configuration file for the intended Worker. C<cloudflare.wrangler>
+selects the executable (C<wrangler> by default); C<cloudflare.environment>
+optionally selects an authored Wrangler environment. The site directory is
+passed with C<--assets>, overriding the config file's asset directory. Missing
+configuration or build output is fatal before deployment. Authentication
+comes from Wrangler's existing login or environment, not publication metadata.
 
-
-=head2 prepare_starlight
-
-Returns a temporary root, prepared Astro Starlight project directory, and
-configuration filename. Generated navigation lists every page explicitly so
-root documents retain their authored titles and source order.
-
-
-=head2 build
-
-Builds one supported backend and returns the absolute output directory.
-
-
-=head2 serve
-
-Starts one supported backend's foreground development server.
-
-
-=head2 gh_publish
-
-Builds a backend, updates a local publication branch through a temporary Git
-worktree, and optionally pushes when its second argument is true. Callers should
-normally use C<run()> so local publication and explicit push remain distinct.
-
-
-=head1 ERRORS
-
-Invalid configuration, missing source/configuration files, failed external
-commands, unsafe chapter identifiers, and Git failures are fatal.
+The Wrangler config owns the Worker name, compatibility date, routing, and
+other deployment settings. Use a static-assets-only config without a C<main>
+script for this documentation workflow. Publishing to an existing Worker can
+update its settings; review its config before invoking this remote action.
 
 
 =head1 SEE ALSO
 
-C<ASPEER::MakeMaker::Markdown::Publish>, C<ASPEER::MakeMaker::Markdown::Pod>
+C<ASPEER::Markdown::Publish::MkDocs>,
+C<ASPEER::Markdown::Publish::VitePress>,
+C<ASPEER::Markdown::Publish::Docusaurus>,
+C<ASPEER::Markdown::Publish::Starlight>,
+C<ASPEER::MakeMaker::Markdown::Publish>
 
 
 =head1 AUTHOR
@@ -1466,12 +1104,8 @@ Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
 
 =head1 LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish.
-
-This software is copyright (c) 2026 by Andrew Speer
-L<mailto:andrew.speer@isolutions.com.au>.
-
-This is free software; you can redistribute it and/or modify it under the same
-terms as the Perl 5 programming language system itself.
+This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+Speer. This is free software; you can redistribute it and/or modify it under
+the same terms as Perl 5.
 
 =cut

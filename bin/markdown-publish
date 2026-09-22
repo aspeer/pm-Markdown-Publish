@@ -1,50 +1,61 @@
 #!/usr/bin/env perl
 
 use strict;
+use vars qw($VERSION);
 use warnings;
 
 use Getopt::Long qw(GetOptions);
 use ASPEER::Markdown::Publish;
+use ASPEER::Markdown::Publish::Constant;
+
+$VERSION='0.001';
 
 
 sub main {
 
     my (%opt, @source_dn);
     GetOptions(
-        'backend=s' => \$opt{'backend'},
+        'module=s'  => \$opt{'module'},
         'config=s'  => \$opt{'config'},
         'source=s'  => \@source_dn,
         'name=s'    => \$opt{'name'},
         'output=s'  => \$opt{'output'},
         'branch=s'  => \$opt{'branch'},
         'remote=s'  => \$opt{'remote'},
+        'version'   => \$opt{'version'},
         'help'      => \$opt{'help'}
     ) || die "invalid options\n";
     if ($opt{'help'}) {
-        print "Usage: markdown-publish BACKEND ACTION [options]\n";
-        print "Backends: mkdocs, vitepress, docusaurus, starlight\n";
-        print "Actions: build, serve, gh_publish, gh_push\n";
+        print "Usage: markdown-publish ACTION [options]\n";
+        print "Actions: build, serve, gh, cloudflare\n";
+        return 0;
+    }
+    if ($opt{'version'}) {
+        print "markdown-publish $VERSION\n";
         return 0;
     }
 
-    my $backend=shift(@ARGV) || 'mkdocs';
     my $action=shift(@ARGV) || 'build';
     die "unexpected arguments: @ARGV\n" if @ARGV;
+    die "--module cannot override a configuration file\n"
+        if defined($opt{'module'}) && ($opt{'config'} || -f $MARKDOWN_PUBLISH_CONFIG_FN);
     my $publish_or;
     if ($opt{'config'}) {
         $publish_or=ASPEER::Markdown::Publish->load_config($opt{'config'});
     }
-    elsif (-f 'doc/project.json') {
-        $publish_or=ASPEER::Markdown::Publish->load_config('doc/project.json');
+    elsif (-f $MARKDOWN_PUBLISH_CONFIG_FN) {
+        $publish_or=ASPEER::Markdown::Publish->load_config($MARKDOWN_PUBLISH_CONFIG_FN);
     }
     else {
-        $publish_or=ASPEER::Markdown::Publish->new();
+        my %config;
+        $config{'module'}=$opt{'module'} if defined($opt{'module'});
+        $publish_or=ASPEER::Markdown::Publish->new(\%config);
     }
     $publish_or->{'sources'}=\@source_dn if @source_dn;
     foreach my $name (qw(name output branch remote)) {
         $publish_or->{$name}=$opt{$name} if defined($opt{$name});
     }
-    $publish_or->run($backend, $action);
+    $publish_or->run($action);
     return 0;
 
 }
@@ -63,21 +74,28 @@ markdown-publish - build, preview, and publish Perl distribution documentation
 # USAGE
 
 ```sh
-markdown-publish mkdocs build
-markdown-publish mkdocs serve
-markdown-publish mkdocs gh_publish
-markdown-publish mkdocs gh_push
+markdown-publish build
+markdown-publish serve --config doc/project.json
+markdown-publish gh --config doc/project.json
+markdown-publish cloudflare --config doc/project.json
 ```
 
-The backend may be `mkdocs`, `vitepress`, `docusaurus`, or `starlight`.
-`gh_publish` changes only the local publication branch. `gh_push` is the
-explicit remote operation.
+`build` prepares and renders the site. `serve` starts the selected engine's
+foreground local server. `gh` builds, updates the configured publication
+branch, and pushes it to a GitHub remote named `github` by default. Use `gh`
+only when a remote update is intended.
 
-Options include `--config FILE`, repeatable `--source DIRECTORY`, `--name`,
-`--output`, `--branch`, and `--remote`. Without `--config`, an existing
-`doc/project.json` is read. Otherwise the module's convention-based defaults
-are used.
+`cloudflare` builds the selected engine and deploys its output to a Cloudflare
+Worker using the `cloudflare.config` Wrangler file in the JSON configuration.
+It does not change a Git branch or push to GitHub.
 
+MkDocs is used when no backend is selected. `--module` selects a backend when
+no configuration file is used. Otherwise put `module` in the JSON configuration.
+`MARKDOWN_PUBLISH_MODULE` overrides either selection. Without `--config`, an existing
+`doc/project.json` is read automatically. Other options are repeatable
+`--source DIRECTORY`, `--name`, `--output`, `--branch`, and `--remote`.
+
+`--version` prints the installed program version.
 
 =end markdown
 
@@ -90,17 +108,25 @@ markdown-publish - build, preview, and publish Perl distribution documentation
 =head1 USAGE
 
 
- markdown-publish mkdocs build
- markdown-publish mkdocs serve
- markdown-publish mkdocs gh_publish
- markdown-publish mkdocs gh_push
-The backend may be C<mkdocs>, C<vitepress>, C<docusaurus>, or C<starlight>.
-C<gh_publish> changes only the local publication branch. C<gh_push> is the
-explicit remote operation.
+ markdown-publish build
+ markdown-publish serve --config doc/project.json
+ markdown-publish gh --config doc/project.json
+ markdown-publish cloudflare --config doc/project.json
+C<build> prepares and renders the site. C<serve> starts the selected engine's
+foreground local server. C<gh> builds, updates the configured publication
+branch, and pushes it to a GitHub remote named C<github> by default. Use C<gh>
+only when a remote update is intended.
 
-Options include C<--config FILE>, repeatable C<--source DIRECTORY>, C<--name>,
-C<--output>, C<--branch>, and C<--remote>. Without C<--config>, an existing
-C<doc/project.json> is read. Otherwise the module's convention-based defaults
-are used.
+C<cloudflare> builds the selected engine and deploys its output to a Cloudflare
+Worker using the C<cloudflare.config> Wrangler file in the JSON configuration.
+It does not change a Git branch or push to GitHub.
+
+MkDocs is used when no backend is selected. C<--module> selects a backend when
+no configuration file is used. Otherwise put C<module> in the JSON configuration.
+C<MARKDOWN_PUBLISH_MODULE> overrides either selection. Without C<--config>, an existing
+C<doc/project.json> is read automatically. Other options are repeatable
+C<--source DIRECTORY>, C<--name>, C<--output>, C<--branch>, and C<--remote>.
+
+C<--version> prints the installed program version.
 
 =cut

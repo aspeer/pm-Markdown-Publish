@@ -1,6 +1,7 @@
 # Existing MkDocs configuration
 
 With ASPEER::Markdown::Publish and Material installed, run
-`markdown-publish mkdocs build` from this directory. Run
-`markdown-publish mkdocs serve` to preview it.
+`markdown-publish build --module ASPEER::Markdown::Publish::MkDocs` from this
+directory. Run `markdown-publish serve --module ASPEER::Markdown::Publish::MkDocs`
+to preview it.
 The authored mkdocs.yml controls the content directory and navigation.

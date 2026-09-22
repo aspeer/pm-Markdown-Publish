@@ -9,29 +9,48 @@ Install this distribution with `cpanm .`, then install the external site
 generator required for the backend you use.
 
 ```sh
-markdown-publish mkdocs build
-markdown-publish mkdocs serve
-markdown-publish mkdocs gh_publish
-# Explicit remote publication:
-markdown-publish mkdocs gh_push
+markdown-publish build
+markdown-publish serve
+# Explicit GitHub publication:
+markdown-publish gh
+# Explicit Cloudflare Workers Static Assets deployment:
+markdown-publish cloudflare --config doc/project.json
 ```
 
-An existing `doc/` directory is the default publication boundary. `lib/` and
-`bin/` sidecars are used only when `doc/` is absent, or when they are named in
-an explicit source list. Guides with multiple top-level headings are split into
-stable ID-based pages.
+An existing `doc/` directory is the default publication boundary. During site
+assembly, Markdown under `lib/` and `bin/` is copied into temporary `lib/` and
+`bin/` directories beside the guide, preserving its relative path and filename.
+For example, a guide can link to `lib/Example/Module.pm.md`. Nothing is copied
+into the repository's `doc/` directory. Mirrored pages are available through
+links but are not added to generated navigation. When `doc/` is absent,
+sidecars become the default source pages; an explicit source list can also
+select them using the existing `modules/` and `utilities/` layout. Guides
+with multiple top-level headings are split into stable ID-based pages.
+For MkDocs, the first top-level page also becomes the home page when no
+`index.md` was authored; its original split URL remains available for links.
 
-Common and backend-specific settings include source directories, configuration
-paths, output directories, publication branch, remote, and executable names.
-Standalone projects may put the configuration in `doc/project.json`.
+MkDocs is the default engine. Select another with `module` in
+`doc/project.json` or with `--module`. `MARKDOWN_PUBLISH_MODULE`
+overrides either selection when set. For example,
+`MARKDOWN_PUBLISH_MODULE=ASPEER::Markdown::Publish::VitePress markdown-publish build`.
+The constants in `ASPEER::Markdown::Publish::Constant` may also be overridden
+by matching environment variables or an adjacent `Constant.pm.local` file.
+Settings include source directories, engine configuration path, output
+directory, publication branch, remote, and executable names.
 
-The HTML output defaults to `site/`. `gh_publish` requires an existing Git
-commit and configured author identity. It updates `gh-pages` through a temporary
-worktree and never pushes. Only `gh_push` updates the configured remote.
+The HTML output defaults to `site/`. `gh` requires an existing Git commit,
+configured author identity, and a GitHub remote named `github` by default. It
+updates `gh-pages` through a temporary worktree and pushes the result.
+
+For Workers Static Assets, set `cloudflare.config` in `doc/project.json` to a
+dedicated Wrangler configuration file. The `cloudflare` action builds the
+selected engine and deploys its site directory with Wrangler; it neither
+commits nor pushes Git. Wrangler's existing login or environment supplies
+authentication.
 
 See [API details](lib/ASPEER/Markdown/Publish.pm.md) and
-[examples](examples/README.md). `Markdown::MkDocs` and `markdown-mkdocs` remain
-as compatibility interfaces for the earlier unpublished implementation.
+[examples](examples/README.md). Each engine has its own module under
+`ASPEER::Markdown::Publish`.
 
 `ASPEER::MakeMaker::Markdown::Publish` supplies equivalent Makefile targets and
 passes the `META_MERGE.x_documentation.publish` field to this module.

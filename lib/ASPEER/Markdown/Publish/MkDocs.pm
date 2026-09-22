@@ -1,0 +1,181 @@
+#
+#  This file is part of ASPEER::Markdown::Publish.
+#
+#  This software is copyright (c) 2026 by Andrew Speer
+#  <andrew.speer@isolutions.com.au>.
+#
+#  This is free software; you can redistribute it and/or modify it under
+#  the same terms as the Perl 5 programming language system itself.
+#
+package ASPEER::Markdown::Publish::MkDocs;
+
+
+#  Compiler pragma and package variables
+#
+use strict qw(vars);
+use vars qw($VERSION @ISA);
+use warnings;
+
+
+#  Parent and supporting packages
+#
+use ASPEER::Markdown::Publish ();
+use ASPEER::Markdown::Publish::Constant;
+use Cwd qw(abs_path);
+use File::Copy qw(copy);
+use File::Spec;
+use JSON::PP qw(encode_json);
+
+
+#  Inheritance and version information
+#
+@ISA=qw(ASPEER::Markdown::Publish);
+$VERSION='0.001';
+
+
+#  Done
+#
+1;
+
+
+#======================================================================================================================
+
+
+sub prepare {
+
+    my ($self, $preview)=@_;
+    my $config_fn=$self->option('config', undef);
+    $config_fn='mkdocs.yml' if !defined($config_fn) && -f 'mkdocs.yml';
+    if (defined($config_fn) && length($config_fn) &&
+        ($self->option('config_mode', '') eq 'direct' || $config_fn eq 'mkdocs.yml')) {
+        die "MkDocs configuration not found: $config_fn\n" unless -f $config_fn;
+        return abs_path($config_fn);
+    }
+    $config_fn='doc/mkdocs/mkdocs.yml'
+        if !defined($config_fn) && -f 'doc/mkdocs/mkdocs.yml';
+
+    my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
+    #  Use the first top-level page as home, retaining its original split URL
+    #  for links already written against that path.
+    #
+    my $has_index=grep {$_ eq 'index.md'} @{$pages_ar};
+    if (@{$pages_ar} && !$has_index && $pages_ar->[0]!~m{[/\\]}) {
+        my $first_fn=File::Spec->catfile($docs_dn, $pages_ar->[0]);
+        my $index_fn=File::Spec->catfile($docs_dn, 'index.md');
+        copy($first_fn, $index_fn) || die "unable to copy $first_fn: $!\n";
+        $pages_ar->[0]='index.md';
+    }
+    my $generated_fn=File::Spec->catfile($temporary_dn, 'mkdocs.yml');
+    my $output_dn=File::Spec->rel2abs($self->option('output', $MARKDOWN_PUBLISH_OUTPUT_DN));
+    my $config='';
+    if (defined($config_fn) && length($config_fn)) {
+        die "MkDocs configuration not found: $config_fn\n" unless -f $config_fn;
+        $config.='INHERIT: '.encode_json(abs_path($config_fn))."\n";
+    }
+    else {
+        $config.='site_name: '.encode_json($self->option('name', 'Documentation'))."\n";
+        $config.="theme:\n  name: material\n";
+        $config.="markdown_extensions:\n  - admonition\n  - attr_list\n  - def_list\n  - footnotes\n  - tables\n  - pymdownx.superfences\n";
+    }
+    $config.='docs_dir: '.encode_json(abs_path($docs_dn))."\n";
+    $config.='site_dir: '.encode_json($output_dn)."\n";
+    $config.="plugins:\n  - search\n" if $preview;
+    $config.="nav:\n";
+    $config.='  - '.encode_json($_)."\n" foreach @{$pages_ar};
+    $self->write_file($generated_fn, $config);
+    return $generated_fn;
+
+}
+
+
+sub build {
+
+    my ($self)=@_;
+    my $output_dn=File::Spec->rel2abs($self->option('output', $MARKDOWN_PUBLISH_OUTPUT_DN));
+    my $config_fn=$self->prepare(0);
+    my @command=($self->option('command', 'mkdocs'), 'build');
+    push(@command, '--strict') if $self->option('strict', 1);
+    push(@command, '-f', $config_fn, '--site-dir', $output_dn);
+    $self->command(@command);
+    return $output_dn;
+
+}
+
+
+sub serve {
+
+    my ($self)=@_;
+    my $config_fn=$self->prepare(1);
+    my @command=($self->option('command', 'mkdocs'), 'serve', '-f', $config_fn);
+    my $address=$self->option('address', undef);
+    push(@command, '-a', $address) if defined($address) && length($address);
+    return $self->system_command(@command);
+
+}
+__END__
+
+=begin markdown
+
+# NAME
+
+ASPEER::Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
+
+# SYNOPSIS
+
+```perl
+use ASPEER::Markdown::Publish::MkDocs;
+my $publish_or=ASPEER::Markdown::Publish::MkDocs->new({sources => ['doc']});
+$publish_or->build();
+```
+
+# DESCRIPTION
+
+This engine prepares a MkDocs configuration and runs MkDocs. Set `config` to
+an authored YAML file. A root `mkdocs.yml` is used directly; other files are
+inherited by a temporary configuration that supplies the assembled documents
+and navigation. Set `config_mode => 'direct'` when an authored file already
+owns that layout. `command`, `strict`, `address`, and `output` customise the
+build and local server. `prepare($preview)` returns the configuration path;
+`build` returns the site directory; `serve` runs the foreground server.
+
+When no home page is authored, the first top-level assembled page is also used
+for `index.md`. Its original URL remains available for existing links.
+
+# SEE ALSO
+
+`ASPEER::Markdown::Publish`
+
+=end markdown
+
+
+=head1 NAME
+
+ASPEER::Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
+
+
+=head1 SYNOPSIS
+
+
+ use ASPEER::Markdown::Publish::MkDocs;
+ my $publish_or=ASPEER::Markdown::Publish::MkDocs->new({sources => ['doc']});
+ $publish_or->build();
+
+=head1 DESCRIPTION
+
+This engine prepares a MkDocs configuration and runs MkDocs. Set C<config> to
+an authored YAML file. A root C<mkdocs.yml> is used directly; other files are
+inherited by a temporary configuration that supplies the assembled documents
+and navigation. Set C<<< config_mode => 'direct' >>> when an authored file already
+owns that layout. C<command>, C<strict>, C<address>, and C<output> customise the
+build and local server. C<prepare($preview)> returns the configuration path;
+C<build> returns the site directory; C<serve> runs the foreground server.
+
+When no home page is authored, the first top-level assembled page is also used
+for C<index.md>. Its original URL remains available for existing links.
+
+
+=head1 SEE ALSO
+
+C<ASPEER::Markdown::Publish>
+
+=cut

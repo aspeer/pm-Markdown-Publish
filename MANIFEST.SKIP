@@ -1,43 +1,34 @@
-# Version control files and dirs.
-\bRCS\b
-\bCVS\b
-,v$
-.svn/
+# Version control files
 ^\.git/
+^\.gitignore$
 
-# ExtUtils::MakeMaker generated files and dirs.
-^MANIFEST\.(?!SKIP)
+# ExtUtils::MakeMaker output
 ^Makefile$
-^Makefile\.\d+$
+^Makefile\.old$
+^MYMETA\.
+^META\.
 ^blib/
 ^blibdirs$
 ^pm_to_blib$
 ^PM_to_blib$
-^MakeMaker-\d
-^MYMETA\.
+^[A-Za-z0-9_.-]+-[0-9][^/]*(?:/|\.tar\.gz$)
 
-# Module::Build
+# Other build output
 ^Build$
-^_build
-
-# Temp, old, vi and emacs files.
-^\.DS_Store$
-(^|/)\._.*$
-\.DS_Store$
-~$
-\.~.*$
-\.old$
-^#.*#$
-^\.#
-\.swp$
-\.bak$
-^\.vscode/
-
-# Git
-^\.gitignore
-
-# Local generated development files.
-^a$
-^foo/
+^_build/
 ^site/
+^node_modules/
 ^\.markdown-pod\.json$
+\.pm\.sha$
+\.pm\.local$
+
+# Editor and operating-system files
+(?:^|/)\.DS_Store$
+(?:^|/)\._.*
+~$
+\.bak$
+\.old$
+\.tmp$
+\.swp$
+^#.*#$
+^\.vscode/
