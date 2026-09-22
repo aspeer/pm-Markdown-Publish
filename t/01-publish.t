@@ -338,13 +338,37 @@ my $serve_or=TestServeMkDocs->new({address => '127.0.0.1:8000'});
 $serve_or->serve();
 is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '127.0.0.1:8000'],
     'MkDocs preview address passed');
+$serve_or=TestServeMkDocs->new();
+$serve_or->serve();
+ok(!grep {$_ eq '-a'} @{$serve_or->{'command'}},
+    'MkDocs keeps its normal listener when globals are undefined');
+{
+    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST='0.0.0.0';
+    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
+    $serve_or=TestServeMkDocs->new();
+    $serve_or->serve();
+    is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '0.0.0.0:8002'],
+        'MkDocs combines global host and port');
+    $serve_or=TestServeMkDocs->new({address => '127.0.0.1:8123'});
+    $serve_or->serve();
+    is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '127.0.0.1:8123'],
+        'explicit MkDocs address takes precedence');
+}
+{
+    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST;
+    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
+    $serve_or=TestServeMkDocs->new();
+    $serve_or->serve();
+    is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '127.0.0.1:8002'],
+        'MkDocs retains its default host when only a global port is set');
+}
 
 foreach my $spec_ar (
-    ['VitePress', 'docs', 'vitepress.mts', 8001],
-    ['Docusaurus', 'site', 'docusaurus.js', 8002],
-    ['Starlight', 'site', 'astro.config.mjs', 8003]
+    ['VitePress', 'docs', 'vitepress.mts', 8001, 5173],
+    ['Docusaurus', 'site', 'docusaurus.js', 8002, 3001],
+    ['Starlight', 'site', 'astro.config.mjs', 8003, 4321]
 ) {
-    my ($name, $dir, $config, $port)=@{$spec_ar};
+    my ($name, $dir, $config, $port, $default_port)=@{$spec_ar};
     my $class="ASPEER::Markdown::Publish::$name";
     my $test_class="TestServe$name";
     {
@@ -365,6 +389,26 @@ foreach my $spec_ar (
         "$name preview port passed");
     is($test_or->{'astro_background'}, 0, 'Starlight preview remains foreground')
         if $name eq 'Starlight';
+    $test_or=$test_class->new();
+    $test_or->serve();
+    is_deeply([@{$test_or->{'command'}}[-4..-1]],
+        ['--host', '127.0.0.1', '--port', $default_port],
+        "$name keeps its default listener when globals are undefined");
+    {
+        no strict qw(refs);
+        local ${$class.'::MARKDOWN_PUBLISH_HOST'}='0.0.0.0';
+        local ${$class.'::MARKDOWN_PUBLISH_PORT'}=8002;
+        $test_or=$test_class->new();
+        $test_or->serve();
+        is_deeply([@{$test_or->{'command'}}[-4..-1]],
+            ['--host', '0.0.0.0', '--port', 8002],
+            "$name accepts global host and port");
+        $test_or=$test_class->new({host => '127.0.0.2', port => 8123});
+        $test_or->serve();
+        is_deeply([@{$test_or->{'command'}}[-4..-1]],
+            ['--host', '127.0.0.2', '--port', 8123],
+            "$name keeps explicit host and port");
+    }
 }
 
 #  Factory dispatch uses MkDocs unless configuration or environment selects a module
@@ -409,6 +453,11 @@ LOCAL_CONSTANTS
 my $constant_code='print join("|", map {$ASPEER::Markdown::Publish::Constant::Constant{$_}} '.
     'qw(MARKDOWN_PUBLISH_MODULE MARKDOWN_PUBLISH_OUTPUT_DN MARKDOWN_PUBLISH_BRANCH))';
 my ($constant_output, $constant_error);
+is($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE, 0,
+    'npm installation is quiet by default');
+ok(!defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST) &&
+    !defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT),
+    'global listen settings are undefined by default');
 {
     local $ENV{'MARKDOWN_PUBLISH_OUTPUT_DN'};
     local $ENV{'MARKDOWN_PUBLISH_BRANCH'};
@@ -437,6 +486,65 @@ my ($constant_output, $constant_error);
         'ASPEER::Markdown::Publish::Docusaurus|environment-site|environment-pages',
         'environment overrides local constants');
 }
+{
+    local $ENV{'MARKDOWN_PUBLISH_NPM_VERBOSE'}=1;
+    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
+        '-e', 'print $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE'],
+        \undef, \$constant_output, \$constant_error);
+    is($?, 0, 'npm verbosity override loads');
+    is($constant_output, '1', 'environment enables npm verbosity');
+}
+{
+    local $ENV{'MARKDOWN_PUBLISH_HOST'}='0.0.0.0';
+    local $ENV{'MARKDOWN_PUBLISH_PORT'}=8002;
+    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
+        '-e', 'print join(":", $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST, $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT)'],
+        \undef, \$constant_output, \$constant_error);
+    is($?, 0, 'global listen overrides load');
+    is($constant_output, '0.0.0.0:8002', 'environment sets global host and port');
+    my $serve_code='package TestEnvironmentMkDocs; '.
+        'our @ISA=("ASPEER::Markdown::Publish::MkDocs"); '.
+        'sub prepare {return "mkdocs.yml"} '.
+        'sub system_command {shift; print join("|", @_); return 1} '.
+        'TestEnvironmentMkDocs->new()->serve()';
+    run3([$^X, "-I$cwd/lib", '-MASPEER::Markdown::Publish::MkDocs',
+        '-e', $serve_code], \undef, \$constant_output, \$constant_error);
+    is($?, 0, 'global listen overrides reach a publisher');
+    is($constant_output, 'mkdocs|serve|-f|mkdocs.yml|-a|0.0.0.0:8002',
+        'environment host and port reach the MkDocs command');
+}
+
+{
+    package TestNpmInstall;
+    use vars qw(@ISA);
+    @ISA=qw(ASPEER::Markdown::Publish);
+    sub system_in_dir {
+        my ($self, $site_dn, @command)=@_;
+        $self->{'install_command'}=[$site_dn, @command];
+        return 1;
+    }
+}
+my $npm_or=TestNpmInstall->new({npm => 'custom-npm'});
+my $npm_status='';
+{
+    local *STDERR;
+    open(STDERR, '>', \$npm_status) || die "unable to capture npm status: $!";
+    $npm_or->npm_install('temporary-project');
+}
+is_deeply($npm_or->{'install_command'},
+    ['temporary-project', 'custom-npm', 'install', '--silent'],
+    'quiet installation suppresses npm output');
+like($npm_status, qr/Installing TestNpmInstall npm dependencies\.\.\.\n.*installed\.\n/s,
+    'quiet installation reports its start and completion');
+{
+    local $ASPEER::Markdown::Publish::MARKDOWN_PUBLISH_NPM_VERBOSE=1;
+    local *STDERR;
+    open(STDERR, '>', \$npm_status) || die "unable to capture npm status: $!";
+    $npm_or->npm_install('temporary-project');
+}
+is_deeply($npm_or->{'install_command'},
+    ['temporary-project', 'custom-npm', 'install'],
+    'verbose installation shows normal npm output');
 
 {
     package TestPublish;

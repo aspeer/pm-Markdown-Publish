@@ -17,11 +17,14 @@ use Cwd qw(abs_path);
 $VERSION='0.001';
 
 %Constant=(
-    MARKDOWN_PUBLISH_MODULE    => 'ASPEER::Markdown::Publish::MkDocs',
-    MARKDOWN_PUBLISH_CONFIG_FN => 'doc/project.json',
-    MARKDOWN_PUBLISH_OUTPUT_DN => 'site',
-    MARKDOWN_PUBLISH_BRANCH    => 'gh-pages',
-    MARKDOWN_PUBLISH_REMOTE    => 'github'
+    MARKDOWN_PUBLISH_MODULE      => 'ASPEER::Markdown::Publish::MkDocs',
+    MARKDOWN_PUBLISH_CONFIG_FN   => 'doc/project.json',
+    MARKDOWN_PUBLISH_OUTPUT_DN   => 'site',
+    MARKDOWN_PUBLISH_BRANCH      => 'gh-pages',
+    MARKDOWN_PUBLISH_REMOTE      => 'github',
+    MARKDOWN_PUBLISH_NPM_VERBOSE => 0,
+    MARKDOWN_PUBLISH_HOST        => undef,
+    MARKDOWN_PUBLISH_PORT        => undef
 );
 
 #  Local preferences sit beside the installed module. Environment variables
@@ -60,9 +63,11 @@ ASPEER::Markdown::Publish::Constant - publication defaults
 # DESCRIPTION
 
 Defines `MARKDOWN_PUBLISH_MODULE`, `MARKDOWN_PUBLISH_CONFIG_FN`,
-`MARKDOWN_PUBLISH_OUTPUT_DN`, `MARKDOWN_PUBLISH_BRANCH`, and
-`MARKDOWN_PUBLISH_REMOTE`. Import individual scalar constants or use the default
-export set. The default publisher is `ASPEER::Markdown::Publish::MkDocs`.
+`MARKDOWN_PUBLISH_OUTPUT_DN`, `MARKDOWN_PUBLISH_BRANCH`,
+`MARKDOWN_PUBLISH_REMOTE`, `MARKDOWN_PUBLISH_NPM_VERBOSE`,
+`MARKDOWN_PUBLISH_HOST`, and `MARKDOWN_PUBLISH_PORT`. Import individual scalar
+constants or use the default export set. The default publisher is
+`ASPEER::Markdown::Publish::MkDocs`.
 
 An optional `Constant.pm.local` beside the installed module may return a hash
 reference of permanent overrides:
@@ -77,6 +82,12 @@ reference of permanent overrides:
 Environment variables named after the constants override both the local file
 and built-in values. `MARKDOWN_PUBLISH_MODULE` also overrides a module supplied
 through the API, `META_MERGE.x_documentation.publish`, or JSON configuration.
+Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm installation output. Its default
+value is `0`; installation start and completion messages are always shown.
+Set `MARKDOWN_PUBLISH_HOST` and `MARKDOWN_PUBLISH_PORT` to control where
+`publish_serve` listens. Both default to undefined, leaving each engine's
+existing address and port in place. Per-engine `host`, `port`, or MkDocs
+`address` settings take precedence.
 
 =end markdown
 
@@ -89,9 +100,11 @@ ASPEER::Markdown::Publish::Constant - publication defaults
 =head1 DESCRIPTION
 
 Defines C<MARKDOWN_PUBLISH_MODULE>, C<MARKDOWN_PUBLISH_CONFIG_FN>,
-C<MARKDOWN_PUBLISH_OUTPUT_DN>, C<MARKDOWN_PUBLISH_BRANCH>, and
-C<MARKDOWN_PUBLISH_REMOTE>. Import individual scalar constants or use the default
-export set. The default publisher is C<ASPEER::Markdown::Publish::MkDocs>.
+C<MARKDOWN_PUBLISH_OUTPUT_DN>, C<MARKDOWN_PUBLISH_BRANCH>,
+C<MARKDOWN_PUBLISH_REMOTE>, C<MARKDOWN_PUBLISH_NPM_VERBOSE>,
+C<MARKDOWN_PUBLISH_HOST>, and C<MARKDOWN_PUBLISH_PORT>. Import individual scalar
+constants or use the default export set. The default publisher is
+C<ASPEER::Markdown::Publish::MkDocs>.
 
 An optional C<Constant.pm.local> beside the installed module may return a hash
 reference of permanent overrides:
@@ -104,5 +117,11 @@ reference of permanent overrides:
 Environment variables named after the constants override both the local file
 and built-in values. C<MARKDOWN_PUBLISH_MODULE> also overrides a module supplied
 through the API, C<META_MERGE.x_documentation.publish>, or JSON configuration.
+Set C<MARKDOWN_PUBLISH_NPM_VERBOSE=1> to show npm installation output. Its default
+value is C<0>; installation start and completion messages are always shown.
+Set C<MARKDOWN_PUBLISH_HOST> and C<MARKDOWN_PUBLISH_PORT> to control where
+C<publish_serve> listens. Both default to undefined, leaving each engine's
+existing address and port in place. Per-engine C<host>, C<port>, or MkDocs
+C<address> settings take precedence.
 
 =cut

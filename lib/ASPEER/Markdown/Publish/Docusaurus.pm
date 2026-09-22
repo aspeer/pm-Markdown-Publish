@@ -134,10 +134,13 @@ sub serve {
     my ($self)=@_;
     my (undef, $site_dn, $config_fn)=$self->prepare();
     $self->npm_install($site_dn);
+    my $host=$self->option('host', $MARKDOWN_PUBLISH_HOST);
+    my $port=$self->option('port', $MARKDOWN_PUBLISH_PORT);
+    $host='127.0.0.1' unless defined($host);
+    $port=3001 unless defined($port);
     return $self->system_in_dir($site_dn, $self->option('npm', 'npm'),
         'run', 'start', '--', '--config', $config_fn,
-        '--host', $self->option('host', '127.0.0.1'),
-        '--port', $self->option('port', 3001));
+        '--host', $host, '--port', $port);
 
 }
 __END__

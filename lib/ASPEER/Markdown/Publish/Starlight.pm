@@ -256,10 +256,13 @@ sub serve {
     $config_arg=$config_fn if $config_arg=~m{^\.\.[/\\]};
     $self->npm_install($site_dn);
     local $ENV{'ASTRO_DEV_BACKGROUND'}=0;
+    my $host=$self->option('host', $MARKDOWN_PUBLISH_HOST);
+    my $port=$self->option('port', $MARKDOWN_PUBLISH_PORT);
+    $host='127.0.0.1' unless defined($host);
+    $port=4321 unless defined($port);
     return $self->system_in_dir($site_dn, $self->option('npm', 'npm'),
         'run', 'start', '--', '--config', $config_arg,
-        '--host', $self->option('host', '127.0.0.1'),
-        '--port', $self->option('port', 4321));
+        '--host', $host, '--port', $port);
 
 }
 __END__

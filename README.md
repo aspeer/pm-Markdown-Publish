@@ -39,6 +39,11 @@ The constants in `ASPEER::Markdown::Publish::Constant` may also be overridden
 by matching environment variables or an adjacent `Constant.pm.local` file.
 Settings include source directories, engine configuration path, output
 directory, publication branch, remote, and executable names.
+For npm-based engines, installation start and completion are always reported.
+Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
+To listen on another interface and port with any publisher, run
+`MARKDOWN_PUBLISH_HOST=0.0.0.0 MARKDOWN_PUBLISH_PORT=8002 make publish_serve`.
+Without these settings, each publisher keeps its existing local server address.
 
 The HTML output defaults to `site/`. `gh` requires an existing Git commit,
 configured author identity, and a GitHub remote named `github` by default. It

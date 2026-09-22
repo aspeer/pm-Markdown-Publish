@@ -110,10 +110,13 @@ sub serve {
     my ($self)=@_;
     my ($temporary_dn, $docs_dn, $config_fn)=$self->prepare();
     $self->npm_install($temporary_dn);
+    my $host=$self->option('host', $MARKDOWN_PUBLISH_HOST);
+    my $port=$self->option('port', $MARKDOWN_PUBLISH_PORT);
+    $host='127.0.0.1' unless defined($host);
+    $port=5173 unless defined($port);
     return $self->system_in_dir($temporary_dn, $self->option('npm', 'npm'),
         'exec', '--', 'vitepress', 'dev', $docs_dn, '--config', $config_fn,
-        '--host', $self->option('host', '127.0.0.1'),
-        '--port', $self->option('port', 5173));
+        '--host', $host, '--port', $port);
 
 }
 __END__

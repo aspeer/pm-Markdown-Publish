@@ -703,7 +703,13 @@ sub npm_install {
 
     my ($self, $site_dn)=@_;
     my $npm=$self->option('npm', 'npm');
-    $self->system_in_dir($site_dn, $npm, 'install', '--silent');
+    my $engine=ref($self);
+    $engine=~s/^.*:://;
+    print STDERR "Installing $engine npm dependencies...\n";
+    my @quiet=defined($MARKDOWN_PUBLISH_NPM_VERBOSE) &&
+        $MARKDOWN_PUBLISH_NPM_VERBOSE eq '1' ? () : ('--silent');
+    $self->system_in_dir($site_dn, $npm, 'install', @quiet);
+    print STDERR "$engine npm dependencies installed.\n";
     return 1;
 
 }

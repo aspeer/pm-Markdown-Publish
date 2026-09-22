@@ -98,6 +98,15 @@ sub serve {
     my $config_fn=$self->prepare(1);
     my @command=($self->option('command', 'mkdocs'), 'serve', '-f', $config_fn);
     my $address=$self->option('address', undef);
+    unless (exists($self->{'address'})) {
+        my $host=$self->option('host', $MARKDOWN_PUBLISH_HOST);
+        my $port=$self->option('port', $MARKDOWN_PUBLISH_PORT);
+        if (defined($host) || defined($port)) {
+            $host='127.0.0.1' unless defined($host);
+            $port=8000 unless defined($port);
+            $address="$host:$port";
+        }
+    }
     push(@command, '-a', $address) if defined($address) && length($address);
     return $self->system_command(@command);
 
