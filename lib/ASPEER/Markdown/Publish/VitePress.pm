@@ -45,6 +45,7 @@ sub prepare {
 
     my ($self)=@_;
     my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
+    $self->promote_home($docs_dn, $pages_ar);
     my $navigation_ar=$self->navigation($docs_dn, $pages_ar);
     $self->normalize_node_markdown($docs_dn);
     my $version=$self->option('version', 'latest');

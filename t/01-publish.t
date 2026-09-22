@@ -8,7 +8,7 @@ use Cwd qw(abs_path getcwd);
 use IPC::Run3 qw(run3);
 use File::Path qw(make_path);
 use File::Temp qw(tempdir);
-use JSON::PP qw(encode_json);
+use JSON::PP qw(decode_json encode_json);
 use Test::More;
 
 use ASPEER::Markdown::Publish;
@@ -50,9 +50,10 @@ my $cwd=getcwd();
 my $constant_fn=abs_path($INC{'ASPEER/Markdown/Publish/Constant.pm'});
 my $temporary_dn=tempdir(CLEANUP => 1);
 chdir($temporary_dn) || die "unable to chdir $temporary_dn: $!";
-make_path('doc/mkdocs', 'lib/Sample', 'bin/nested', 'config');
+make_path('doc/mkdocs', 'doc/reference', 'lib/Sample', 'bin/nested', 'config');
 blurp('doc/guide.md', "# Start {#start}\n\n[Module](lib/Sample/Module.pm.md)\n\n[Utility](bin/nested/example.md)\n\n[Next](#next)\n\n# Next {#next}\n\nDone.\n");
-blurp('lib/Sample/Module.pm.md', "# Sample::Module\n\nModule documentation.\n");
+blurp('doc/reference/child.md', "# Child\n\nLinked reference.\n\n# Detail\n\nMore detail.\n");
+blurp('lib/Sample/Module.pm.md', "# Sample::Module\n\n## Details\n\nModule documentation.\n");
 blurp('bin/nested/example.md', "# example\n\nUtility documentation.\n");
 
 
@@ -67,12 +68,16 @@ is(slurp("$docs_dn/lib/Sample/Module.pm.md"), slurp('lib/Sample/Module.pm.md'),
 is(slurp("$docs_dn/bin/nested/example.md"), slurp('bin/nested/example.md'),
     'nested executable Markdown is mirrored with its path intact');
 ok(!-e 'doc/lib' && !-e 'doc/bin', 'assembly leaves authored doc directory untouched');
+is(slurp("$docs_dn/reference/child.md"), slurp('doc/reference/child.md'),
+    'nested Markdown remains linkable without chapter splitting');
+ok(!-e "$docs_dn/reference/child--child.md",
+    'nested Markdown is not split into navigation sections');
 like(slurp("$docs_dn/guide--start.md"), qr/\[Module\]\(lib\/Sample\/Module\.pm\.md\)/,
     'chapter link to mirrored module is preserved');
 like(slurp("$docs_dn/guide--start.md"), qr/\[Next\]\(guide--next\.md\)/,
     'chapter links use the split page without a redundant heading fragment');
 is_deeply($pages_ar, ['guide--start.md', 'guide--next.md'],
-    'first split section leads navigation without the generated index or sidecars');
+    'first split section leads navigation without nested pages or sidecars');
 unlike(slurp("$docs_dn/index.md"), qr{lib/Sample|bin/nested},
     'generated index omits mirrored sidecars');
 my $navigation_fn=$publish_or->prepare();
@@ -97,11 +102,12 @@ ok(-f "$docs_dn/modules/Sample_Module.md", 'explicit lib source publishes module
 ok(-f "$docs_dn/utilities/nested/example.md", 'explicit bin source publishes utility sidecar');
 
 
-#  An existing empty doc directory remains an intentional boundary
+#  Nested documents alone do not become navigation pages
 #
 unlink('doc/guide.md') || die "unable to remove disposable guide: $!";
 eval {ASPEER::Markdown::Publish::MkDocs->new()->prepare_docs()};
-like($@, qr/no Markdown documents discovered/, 'empty doc does not fall back to sidecars');
+like($@, qr/no Markdown documents discovered/,
+    'nested-only doc does not fall back to sidecars');
 blurp('doc/guide.md', "# Guide\n\nText.\n");
 
 
@@ -139,7 +145,7 @@ like(slurp($mkdocs_fn), qr/^docs_dir: /m, 'assembled documentation overrides doc
 
 blurp('config/vitepress.mts', "export default { title: 'Custom' };\n");
 blurp('doc/chapters.md',
-    "# First Chapter {#first}\n\nFirst.\n\n# Second Chapter {#second}\n\nSecond.\n");
+    "# First Chapter {#first}\n\nFirst.\n\n[Module](lib/Sample/Module.pm.md#details)\n\n[Reference][ref]\n\n[ref]: reference/child.md#detail\n\n# Second Chapter {#second}\n\nSecond.\n");
 blurp('doc/formatting.md', <<'MARKDOWN');
 # Formatting {#formatting}
 
@@ -162,11 +168,21 @@ MARKDOWN
 $publish_or=ASPEER::Markdown::Publish::VitePress->new({sources => ['doc']});
 my (undef, $generated_vitepress_dn, $generated_vitepress_fn)=$publish_or->prepare();
 my $vitepress_config=slurp($generated_vitepress_fn);
+like($vitepress_config, qr/text: "First Chapter", link: "\/"/,
+    'VitePress home and first sidebar entry use the first split section');
 like($vitepress_config,
     qr/text: "First Chapter".*text: "Second Chapter"/s,
     'VitePress navigation uses authored titles in source order');
 unlike($vitepress_config, qr/text: "chapters--first\.md"/,
     'VitePress does not expose generated filenames as labels');
+unlike($vitepress_config, qr/reference\/child|Sample\/Module/,
+    'VitePress sidebar excludes nested and mirrored Markdown');
+is(slurp("$generated_vitepress_dn/index.md"),
+    slurp("$generated_vitepress_dn/chapters--first.md"),
+    'VitePress home contains the first split section');
+ok(-f "$generated_vitepress_dn/reference/child.md" &&
+    -f "$generated_vitepress_dn/lib/Sample/Module.pm.md",
+    'VitePress retains linked child and module pages');
 my $vitepress_formatting=slurp("$generated_vitepress_dn/formatting.md");
 like($vitepress_formatting, qr/- \*\*`handler=METHOD`\*\*\n\n  Call a handler\./,
     'VitePress receives portable CommonMark definition items');
@@ -192,9 +208,22 @@ my (undef, $generated_docusaurus_dn, $generated_docusaurus_fn)=
 like(slurp($generated_docusaurus_fn), qr/markdown: \{ format: 'detect' \}/,
     'generated Docusaurus project enables CommonMark detection');
 my $docusaurus_sidebar=slurp("$generated_docusaurus_dn/sidebars.js");
+my ($sidebar_json)=$docusaurus_sidebar=~/\Amodule\.exports = \{ docs: (\[.*\]) \};/;
+my $sidebar_ar=decode_json($sidebar_json);
+is_deeply($sidebar_ar->[0],
+    {id => 'index', label => 'First Chapter', type => 'doc'},
+    'Docusaurus home and first sidebar entry use the first split section');
 like($docusaurus_sidebar,
     qr/"label":"First Chapter".*"label":"Second Chapter"/s,
     'Docusaurus sidebar uses authored titles in source order');
+unlike($docusaurus_sidebar, qr/reference\/child|Sample\/Module/,
+    'Docusaurus sidebar excludes nested and mirrored Markdown');
+is(slurp("$generated_docusaurus_dn/docs/index.md"),
+    slurp("$generated_docusaurus_dn/docs/chapters--first.md"),
+    'Docusaurus home contains the first split section');
+ok(-f "$generated_docusaurus_dn/docs/reference/child.md" &&
+    -f "$generated_docusaurus_dn/docs/lib/Sample/Module.pm.md",
+    'Docusaurus retains linked child and module pages');
 like(slurp("$generated_docusaurus_dn/docs/chapters--first.md"),
     qr/\A---\ntitle: "First Chapter"\n---\n\n<a id="first"><\/a>/,
     'Docusaurus receives an explicit title before its heading anchor');
@@ -217,13 +246,26 @@ blurp('doc/ModuleName.md', "# Mixed Case Module\n\nText.\n");
 $publish_or=ASPEER::Markdown::Publish::Starlight->new({sources => ['doc']});
 my (undef, $generated_starlight_dn, $generated_starlight_fn)=$publish_or->prepare();
 my $starlight_config=slurp($generated_starlight_fn);
+like($starlight_config, qr/processor: unified\(\{ remarkPlugins: \[localLinks\] \}\)/,
+    'Starlight uses its local Markdown link resolver');
+like(slurp("$generated_starlight_dn/local-links.mjs"),
+    qr/node\.type === 'link' \|\| node\.type === 'definition'/,
+    'Starlight resolves inline and reference Markdown links');
+like($starlight_config, qr/label: "Mixed Case Module", slug: "index"/,
+    'Starlight home and first sidebar entry use the first page');
 like($starlight_config,
     qr/label: "First Chapter", slug: "chapters--first".*label: "Second Chapter", slug: "chapters--second"/s,
     'Starlight navigation includes root pages in source order');
-like($starlight_config, qr/label: "Mixed Case Module", slug: "modulename"/,
-    'Starlight navigation uses Astro-normalized lower-case slugs');
+unlike($starlight_config, qr/reference\/child|Sample\/Module/,
+    'Starlight sidebar excludes nested and mirrored Markdown');
 unlike($starlight_config, qr/autogenerate/,
     'Starlight does not depend on root-directory autogeneration');
+is(slurp("$generated_starlight_dn/src/content/docs/index.md"),
+    slurp("$generated_starlight_dn/src/content/docs/ModuleName.md"),
+    'Starlight home contains the first source page');
+ok(-f "$generated_starlight_dn/src/content/docs/reference/child.md" &&
+    -f "$generated_starlight_dn/src/content/docs/lib/Sample/Module.pm.md",
+    'Starlight retains linked child and module pages');
 my $starlight_formatting=slurp("$generated_starlight_dn/src/content/docs/formatting.md");
 like($starlight_formatting,
     qr/\A---\ntitle: "Formatting"\n---\n\n<a id="formatting"><\/a>\n\n- \*\*`handler=METHOD`\*\*/,
@@ -239,8 +281,31 @@ $publish_or=ASPEER::Markdown::Publish::Starlight->new({
     sources => ['doc'], config => 'config/astro.mjs'
 });
 my (undef, $starlight_dn, $starlight_config_fn)=$publish_or->prepare();
-is($starlight_config_fn, abs_path('config/astro.mjs'),
-    'custom Starlight configuration location retained');
+is($starlight_config_fn, "$starlight_dn/astro.config.mjs",
+    'authored Starlight configuration is wrapped in the temporary project');
+like(slurp($starlight_config_fn), qr/mergeConfig\(authored, \{ markdown: \{ processor: configured \} \}\)/,
+    'Starlight link resolver also applies to authored configuration');
+my $authored_starlight_config_fn=abs_path('config/astro.mjs');
+like(slurp($starlight_config_fn), qr/\Q$authored_starlight_config_fn\E/,
+    'temporary configuration imports the authored configuration');
+
+SKIP: {
+    skip 'set STARLIGHT_TEST=1 to run a real Astro build', 4
+        unless $ENV{'STARLIGHT_TEST'};
+    my $real_or=ASPEER::Markdown::Publish::Starlight->new({
+        sources => ['doc'], output => "$temporary_dn/starlight-site"
+    });
+    my $real_site_dn=$real_or->build();
+    my $chapter_html=slurp("$real_site_dn/chapters--first/index.html");
+    like($chapter_html, qr{href="\.\./lib/sample/modulepm/\#details"},
+        'Starlight resolves mixed-case module Markdown links');
+    like($chapter_html, qr{href="\.\./reference/child/\#detail"},
+        'Starlight resolves reference-style child Markdown links');
+    ok(-f "$real_site_dn/lib/sample/modulepm/index.html",
+        'resolved module route exists');
+    ok(-f "$real_site_dn/reference/child/index.html",
+        'resolved child route exists');
+}
 
 
 #  Backend methods receive their own configuration and command overrides

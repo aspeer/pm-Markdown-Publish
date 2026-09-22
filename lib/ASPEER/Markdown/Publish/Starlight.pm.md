@@ -18,6 +18,10 @@ engine create one. `npm`, `astro_version`, `starlight_version`, `host`, `port`,
 and `output` customise operation. `prepare` returns the temporary root,
 project directory, and configuration path; `build` returns the site directory;
 `serve` runs the foreground server.
+Local Markdown links such as `lib/Example/Module.pm.md` are resolved to the
+corresponding Starlight page in the temporary project. An authored Astro
+configuration is wrapped to retain this behavior; its Markdown processor must
+be unified if it sets one explicitly.
 
 # SEE ALSO
 

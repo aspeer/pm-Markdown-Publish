@@ -275,11 +275,30 @@ sub copy_markdown_tree {
 }
 
 
+sub promote_home {
+
+    #  Keep the first page's original path available for authored links.
+    #  Only a top-level page can be copied to index without rebasing its links.
+    #
+    my ($self, $docs_dn, $pages_ar)=@_;
+    return unless @{$pages_ar};
+    my $has_index=grep {$_ eq 'index.md'} @{$pages_ar};
+    return if $has_index || $pages_ar->[0]=~m{[/\\]};
+    my $first_fn=File::Spec->catfile($docs_dn, $pages_ar->[0]);
+    my $index_fn=File::Spec->catfile($docs_dn, 'index.md');
+    copy($first_fn, $index_fn) || die "unable to copy $first_fn: $!\n";
+    $pages_ar->[0]='index.md';
+    return 1;
+
+}
+
+
 sub prepare_docs {
 
 
     #  Assemble the configured source roots and mirror lib/bin Markdown when
-    #  doc is selected. Keep all generated pages in the disposable tree.
+    #  doc is selected. Nested documents remain linkable but outside generated
+    #  navigation.
     #
     my ($self)=@_;
     my $temporary_dn=abs_path(tempdir(CLEANUP => 1));
@@ -305,8 +324,10 @@ sub prepare_docs {
                 my $output_fn=File::Spec->catfile($docs_dn, $target_fn);
                 my (undef, $parent_dn)=File::Spec->splitpath($output_fn);
                 make_path($parent_dn);
+                my $navigation_page=$source_dn eq 'lib' || $source_dn eq 'bin' ||
+                    $target_fn!~m{[/\\]};
 
-                if ($source_dn eq 'doc') {
+                if ($source_dn eq 'doc' && $navigation_page) {
                     open(my $input_fh, '<', $fn) || die "unable to read $fn: $!\n";
                     local $/=undef;
                     my $markdown=<$input_fh>;
@@ -322,7 +343,7 @@ sub prepare_docs {
                     }
                 }
                 copy($fn, $output_fn) || die "unable to copy $fn: $!\n";
-                push(@pages, $target_fn);
+                push(@pages, $target_fn) if $navigation_page;
             }
         }, $source_dn);
     }
@@ -814,6 +835,9 @@ Mirrored pages are available through links but are not added to generated
 navigation. When `doc/` is absent, sidecars become the default source pages.
 Set `sources` explicitly to include other directories. Source files are never rewritten;
 assembly and engine-specific Markdown adjustments happen in temporary trees.
+Nested Markdown under `doc/` remains available for links but does not appear
+in generated navigation. When no `index.md` was authored, the first top-level
+page becomes the home page in each engine; its original URL remains available.
 
 # CONFIGURATION
 
@@ -977,6 +1001,9 @@ not added to generated navigation. When C<doc/> is absent, sidecars become the
 default source pages. Set C<sources> explicitly to include other directories. Source
 files are never rewritten; assembly and engine-specific Markdown adjustments
 happen in temporary trees.
+Nested Markdown under C<doc/> remains available for links but does not appear
+in generated navigation. When no C<index.md> was authored, the first top-level
+page becomes the home page in each engine; its original URL remains available.
 
 
 =head1 CONFIGURATION

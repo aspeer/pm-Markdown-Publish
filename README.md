@@ -26,8 +26,10 @@ links but are not added to generated navigation. When `doc/` is absent,
 sidecars become the default source pages; an explicit source list can also
 select them using the existing `modules/` and `utilities/` layout. Guides
 with multiple top-level headings are split into stable ID-based pages.
-For MkDocs, the first top-level page also becomes the home page when no
-`index.md` was authored; its original split URL remains available for links.
+Nested Markdown under `doc/` is available through links but is not split or
+added to generated navigation. For each engine, the first top-level page
+becomes the home page when no `index.md` was authored; its original URL remains
+available for links.
 
 MkDocs is the default engine. Select another with `module` in
 `doc/project.json` or with `--module`. `MARKDOWN_PUBLISH_MODULE`

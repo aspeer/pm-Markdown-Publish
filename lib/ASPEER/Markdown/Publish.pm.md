@@ -35,6 +35,9 @@ Mirrored pages are available through links but are not added to generated
 navigation. When `doc/` is absent, sidecars become the default source pages.
 Set `sources` explicitly to include other directories. Source files are never rewritten;
 assembly and engine-specific Markdown adjustments happen in temporary trees.
+Nested Markdown under `doc/` remains available for links but does not appear
+in generated navigation. When no `index.md` was authored, the first top-level
+page becomes the home page in each engine; its original URL remains available.
 
 # CONFIGURATION
 

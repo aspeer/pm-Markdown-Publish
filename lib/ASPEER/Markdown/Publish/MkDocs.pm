@@ -22,7 +22,6 @@ use warnings;
 use ASPEER::Markdown::Publish ();
 use ASPEER::Markdown::Publish::Constant;
 use Cwd qw(abs_path);
-use File::Copy qw(copy);
 use File::Spec;
 use JSON::PP qw(encode_json);
 
@@ -55,16 +54,7 @@ sub prepare {
         if !defined($config_fn) && -f 'doc/mkdocs/mkdocs.yml';
 
     my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
-    #  Use the first top-level page as home, retaining its original split URL
-    #  for links already written against that path.
-    #
-    my $has_index=grep {$_ eq 'index.md'} @{$pages_ar};
-    if (@{$pages_ar} && !$has_index && $pages_ar->[0]!~m{[/\\]}) {
-        my $first_fn=File::Spec->catfile($docs_dn, $pages_ar->[0]);
-        my $index_fn=File::Spec->catfile($docs_dn, 'index.md');
-        copy($first_fn, $index_fn) || die "unable to copy $first_fn: $!\n";
-        $pages_ar->[0]='index.md';
-    }
+    $self->promote_home($docs_dn, $pages_ar);
     my $generated_fn=File::Spec->catfile($temporary_dn, 'mkdocs.yml');
     my $output_dn=File::Spec->rel2abs($self->option('output', $MARKDOWN_PUBLISH_OUTPUT_DN));
     my $config='';

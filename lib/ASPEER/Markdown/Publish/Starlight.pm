@@ -45,6 +45,7 @@ sub prepare {
 
     my ($self)=@_;
     my ($temporary_dn, $docs_dn, $pages_ar)=$self->prepare_docs();
+    $self->promote_home($docs_dn, $pages_ar);
     my $navigation_ar=$self->navigation($docs_dn, $pages_ar);
     my $site_dn=File::Spec->catdir($temporary_dn, 'starlight');
     my $site_docs_dn=File::Spec->catdir($site_dn, 'src', 'content', 'docs');
@@ -56,14 +57,34 @@ sub prepare {
     my $package_hr={
         type         => 'module',
         scripts      => {build => 'astro build', start => 'astro dev'},
-        dependencies => {astro => $astro_version, '@astrojs/starlight' => $starlight_version}
+        dependencies => {
+            astro                      => $astro_version,
+            '@astrojs/starlight'       => $starlight_version,
+            '@astrojs/markdown-remark' => 'latest',
+            'github-slugger'          => 'latest'
+        }
     };
     $self->write_file(File::Spec->catfile($site_dn, 'package.json'), encode_json($package_hr));
+    $self->write_file(File::Spec->catfile($site_dn, 'local-links.mjs'), $self->local_links_plugin());
     my $config_fn=$self->option('config', undef);
     my $prepared_config_fn;
     if (defined($config_fn) && length($config_fn)) {
         die "Starlight configuration not found: $config_fn\n" unless -f $config_fn;
-        $prepared_config_fn=abs_path($config_fn);
+        my $authored_fn=abs_path($config_fn);
+        my $config="import { defineConfig, mergeConfig } from 'astro/config';\n".
+            "import { pathToFileURL } from 'node:url';\n".
+            "import { unified } from '\@astrojs/markdown-remark';\n".
+            "import localLinks from './local-links.mjs';\n\n".
+            "const authored = (await import(pathToFileURL(".encode_json($authored_fn).
+            ").href)).default;\n".
+            "const markdown = authored.markdown || {};\n".
+            "const processor = markdown.processor;\n".
+            "if (processor && processor.name !== 'unified') throw new Error('Starlight link resolution requires unified Markdown processing');\n".
+            "const options = processor ? processor.options : {};\n".
+            "const configured = unified({ ...options, remarkPlugins: [...(options.remarkPlugins || []), ...(markdown.remarkPlugins || []), localLinks] });\n".
+            "export default defineConfig(mergeConfig(authored, { markdown: { processor: configured } }));\n";
+        $prepared_config_fn=File::Spec->catfile($site_dn, 'astro.config.mjs');
+        $self->write_file($prepared_config_fn, $config);
     }
     else {
         my @items=map {
@@ -73,8 +94,12 @@ sub prepare {
                 ", slug: ".encode_json($slug)." }"
         } @{$navigation_ar};
         my $config="import { defineConfig } from 'astro/config';\n".
+            "import { unified } from '\@astrojs/markdown-remark';\n".
             "import starlight from '\@astrojs/starlight';\n\n".
-            "export default defineConfig({\n  integrations: [starlight({\n    title: ".
+            "import localLinks from './local-links.mjs';\n\n".
+            "export default defineConfig({\n".
+            "  markdown: { processor: unified({ remarkPlugins: [localLinks] }) },\n".
+            "  integrations: [starlight({\n    title: ".
             encode_json($self->option('name', 'Documentation')).
             ",\n    sidebar: [{ label: 'Docs', items: [\n".
             join(",\n", @items)."\n    ] }]\n  })]\n});\n";
@@ -87,6 +112,50 @@ sub prepare {
         "import { docsSchema } from '\@astrojs/starlight/schema';\n\n".
         "export const collections = { docs: defineCollection({ loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/docs' }), schema: docsSchema() }) };\n");
     return ($temporary_dn, $site_dn, $prepared_config_fn);
+
+}
+
+
+sub local_links_plugin {
+
+    #  Astro routes Markdown through slugged page IDs; resolve authored file
+    #  links while their source paths are still available to remark.
+    #
+    return <<'JAVASCRIPT';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { slug } from 'github-slugger';
+
+const root = path.resolve('src/content/docs');
+
+function route(filename) {
+  const parts = path.relative(root, filename).replace(/\\/g, '/').replace(/\.mdx?$/i, '').split('/');
+  const id = parts.map((part) => slug(part)).join('/');
+  if (id === 'index') return '/';
+  if (parts[parts.length - 1].toLowerCase() === 'index') return '/' + parts.slice(0, -1).map((part) => slug(part)).join('/') + '/';
+  return '/' + id + '/';
+}
+
+export default function localLinks() {
+  return (tree, file) => {
+    function visit(node) {
+      if ((node.type === 'link' || node.type === 'definition') && typeof node.url === 'string') {
+        const match = /^([^?#]+\.mdx?)(\?[^#]*)?(#.*)?$/i.exec(node.url);
+        if (match && !match[1].startsWith('/') && !match[1].includes('://')) {
+          const target = path.resolve(path.dirname(file.path), decodeURI(match[1]));
+          if (target.startsWith(root + path.sep) && existsSync(target)) {
+            const from = route(file.path);
+            const to = route(target);
+            node.url = (path.posix.relative(from, to) || '.') + '/' + (match[2] || '') + (match[3] || '');
+          }
+        }
+      }
+      for (const child of node.children || []) visit(child);
+    }
+    visit(tree);
+  };
+}
+JAVASCRIPT
 
 }
 
@@ -217,6 +286,10 @@ engine create one. `npm`, `astro_version`, `starlight_version`, `host`, `port`,
 and `output` customise operation. `prepare` returns the temporary root,
 project directory, and configuration path; `build` returns the site directory;
 `serve` runs the foreground server.
+Local Markdown links such as `lib/Example/Module.pm.md` are resolved to the
+corresponding Starlight page in the temporary project. An authored Astro
+configuration is wrapped to retain this behavior; its Markdown processor must
+be unified if it sets one explicitly.
 
 # SEE ALSO
 
@@ -245,6 +318,10 @@ engine create one. C<npm>, C<astro_version>, C<starlight_version>, C<host>, C<po
 and C<output> customise operation. C<prepare> returns the temporary root,
 project directory, and configuration path; C<build> returns the site directory;
 C<serve> runs the foreground server.
+Local Markdown links such as C<lib/Example/Module.pm.md> are resolved to the
+corresponding Starlight page in the temporary project. An authored Astro
+configuration is wrapped to retain this behavior; its Markdown processor must
+be unified if it sets one explicitly.
 
 
 =head1 SEE ALSO
