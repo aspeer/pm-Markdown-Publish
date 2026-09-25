@@ -21,7 +21,6 @@ sub main {
         'name=s'    => \$opt{'name'},
         'output=s'  => \$opt{'output'},
         'branch=s'  => \$opt{'branch'},
-        'remote=s'  => \$opt{'remote'},
         'version'   => \$opt{'version'},
         'help'      => \$opt{'help'}
     ) || die "invalid options\n";
@@ -52,7 +51,7 @@ sub main {
         $publish_or=ASPEER::Markdown::Publish->new(\%config);
     }
     $publish_or->{'sources'}=\@source_dn if @source_dn;
-    foreach my $name (qw(name output branch remote)) {
+    foreach my $name (qw(name output branch)) {
         $publish_or->{$name}=$opt{$name} if defined($opt{$name});
     }
     $publish_or->run($action);
@@ -82,8 +81,8 @@ markdown-publish cloudflare --config doc/project.json
 
 `build` prepares and renders the site. `serve` starts the selected engine's
 foreground local server. `gh` builds, updates the configured publication
-branch, and pushes it to a GitHub remote named `github` by default. Use `gh`
-only when a remote update is intended.
+branch, and leaves it local. Push that branch through the repository's normal
+Git workflow.
 
 `cloudflare` builds the selected engine and deploys its output to a Cloudflare
 Worker using the `cloudflare.config` Wrangler file in the JSON configuration.
@@ -91,9 +90,11 @@ It does not change a Git branch or push to GitHub.
 
 MkDocs is used when no backend is selected. `--module` selects a backend when
 no configuration file is used. Otherwise put `module` in the JSON configuration.
-`MARKDOWN_PUBLISH_MODULE` overrides either selection. Without `--config`, an existing
-`doc/project.json` is read automatically. Other options are repeatable
-`--source DIRECTORY`, `--name`, `--output`, `--branch`, and `--remote`.
+`MARKDOWN_PUBLISH_MODULE` overrides either selection. Bundled publishers may be
+selected with `mkdocs`, `vitepress`, `docusaurus`, or `starlight`; a fully
+qualified name may select another installed subclass. Without `--config`, an
+existing `doc/project.json` is read automatically. Other options are repeatable
+`--source DIRECTORY`, `--name`, `--output`, and `--branch`.
 
 `--version` prints the installed program version.
 
@@ -114,8 +115,8 @@ markdown-publish - build, preview, and publish Perl distribution documentation
  markdown-publish cloudflare --config doc/project.json
 C<build> prepares and renders the site. C<serve> starts the selected engine's
 foreground local server. C<gh> builds, updates the configured publication
-branch, and pushes it to a GitHub remote named C<github> by default. Use C<gh>
-only when a remote update is intended.
+branch, and leaves it local. Push that branch through the repository's normal
+Git workflow.
 
 C<cloudflare> builds the selected engine and deploys its output to a Cloudflare
 Worker using the C<cloudflare.config> Wrangler file in the JSON configuration.
@@ -123,9 +124,11 @@ It does not change a Git branch or push to GitHub.
 
 MkDocs is used when no backend is selected. C<--module> selects a backend when
 no configuration file is used. Otherwise put C<module> in the JSON configuration.
-C<MARKDOWN_PUBLISH_MODULE> overrides either selection. Without C<--config>, an existing
-C<doc/project.json> is read automatically. Other options are repeatable
-C<--source DIRECTORY>, C<--name>, C<--output>, C<--branch>, and C<--remote>.
+C<MARKDOWN_PUBLISH_MODULE> overrides either selection. Bundled publishers may be
+selected with C<mkdocs>, C<vitepress>, C<docusaurus>, or C<starlight>; a fully
+qualified name may select another installed subclass. Without C<--config>, an
+existing C<doc/project.json> is read automatically. Other options are repeatable
+C<--source DIRECTORY>, C<--name>, C<--output>, and C<--branch>.
 
 C<--version> prints the installed program version.
 

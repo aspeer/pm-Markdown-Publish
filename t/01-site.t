@@ -41,7 +41,7 @@ like($preview_config, qr/^docs_dir: /m,
 like($preview_config, qr/^plugins:\n  - search$/m,
     'preview uses locally available search plugin');
 SKIP: {
-    skip 'set MKDOCS_TEST=1 to run external build and Git tests', 8 unless $ENV{'MKDOCS_TEST'};
+    skip 'set MKDOCS_TEST=1 to run external build and Git tests', 6 unless $ENV{'MKDOCS_TEST'};
     my $site_dn=$site_or->build();
     ok(-f "$site_dn/guide/index.html", 'real MkDocs HTML generated');
     ok(-f "$site_dn/index.html", 'site has a working home page');
@@ -50,18 +50,12 @@ SKIP: {
     $site_or->command('git', 'config', 'user.email', 'test@example.invalid');
     $site_or->command('git', 'add', 'doc');
     $site_or->command('git', 'commit', '-m', 'Initial');
-    eval {$site_or->publish_gh()};
-    like($@, qr/remote get-url github/, 'GitHub action requires an explicit remote');
-    $site_or->command('git', 'init', '--bare', "$dir/remote.git");
-    $site_or->command('git', 'remote', 'add', 'github', "$dir/remote.git");
-    is($site_or->publish_gh(), 'gh-pages', 'publication branch created and pushed');
+    is($site_or->publish_gh(), 'gh-pages', 'local publication branch created');
     is($site_or->command('git', 'branch', '--show-current'), "main\n", 'current branch preserved');
     my $head=$site_or->command('git', 'rev-parse', 'gh-pages');
     $site_or->publish_gh();
     is($site_or->command('git', 'rev-parse', 'gh-pages'), $head, 'unchanged site produces no commit');
     like($site_or->command('git', 'ls-tree', '-r', '--name-only', 'gh-pages'), qr/\.nojekyll/, 'static-site marker published');
-    is($site_or->command('git', '-C', "$dir/remote.git", 'rev-parse', 'gh-pages'), $head,
-        'push updates only the disposable test remote');
 }
 chdir($cwd) or die $!;
 done_testing();

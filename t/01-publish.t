@@ -422,6 +422,38 @@ isa_ok(ASPEER::Markdown::Publish->new({sources => ['doc']}),
 blurp('config/default-project.json', encode_json({publish => {sources => ['doc']}}));
 isa_ok(ASPEER::Markdown::Publish->load_config('config/default-project.json'),
     'ASPEER::Markdown::Publish::MkDocs', 'configuration without module defaults to MkDocs');
+foreach my $spec_ar (
+    [mkdocs     => 'ASPEER::Markdown::Publish::MkDocs'],
+    [vitepress  => 'ASPEER::Markdown::Publish::VitePress'],
+    [docusaurus => 'ASPEER::Markdown::Publish::Docusaurus'],
+    [starlight  => 'ASPEER::Markdown::Publish::Starlight']
+) {
+    my ($alias, $publisher)=@{$spec_ar};
+    isa_ok(ASPEER::Markdown::Publish->new({
+        module => $alias, sources => ['doc']
+    }), $publisher, "$alias publisher shortcut");
+}
+isa_ok(ASPEER::Markdown::Publish->new({module => 'Docusaurus'}),
+    'ASPEER::Markdown::Publish::Docusaurus',
+    'publisher shortcuts are case insensitive');
+blurp('config/alias-project.json', encode_json({publish => {
+    module => 'vitepress', sources => ['doc']
+}}));
+isa_ok(ASPEER::Markdown::Publish->load_config('config/alias-project.json'),
+    'ASPEER::Markdown::Publish::VitePress',
+    'JSON configuration accepts a publisher shortcut');
+
+{
+    package Local::Markdown::Publisher;
+    use vars qw(@ISA);
+    @ISA=qw(ASPEER::Markdown::Publish);
+}
+{
+    local $INC{'Local/Markdown/Publisher.pm'}=__FILE__;
+    isa_ok(ASPEER::Markdown::Publish->new({
+        module => 'Local::Markdown::Publisher'
+    }), 'Local::Markdown::Publisher', 'external publisher module accepted');
+}
 {
     local $ENV{'MARKDOWN_PUBLISH_MODULE'}='ASPEER::Markdown::Publish::VitePress';
     isa_ok(ASPEER::Markdown::Publish->new({module => 'ASPEER::Markdown::Publish::MkDocs'}),
@@ -430,12 +462,24 @@ isa_ok(ASPEER::Markdown::Publish->load_config('config/default-project.json'),
         'ASPEER::Markdown::Publish::VitePress', 'environment overrides JSON module');
 }
 {
-    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='Other::Module';
-    eval {ASPEER::Markdown::Publish->new({})};
-    like($@, qr/invalid publication module/, 'invalid environment module rejected');
+    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='docusaurus';
+    isa_ok(ASPEER::Markdown::Publish->new({
+        module => 'ASPEER::Markdown::Publish::MkDocs'
+    }), 'ASPEER::Markdown::Publish::Docusaurus',
+        'environment shortcut selects publisher');
 }
-eval {ASPEER::Markdown::Publish->new({module => 'Other::Module'})};
-like($@, qr/invalid publication module/, 'module outside namespace rejected');
+{
+    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='Missing::Publisher';
+    eval {ASPEER::Markdown::Publish->new({})};
+    like($@, qr/unable to load publication module Missing::Publisher/,
+        'missing environment module rejected');
+}
+eval {ASPEER::Markdown::Publish->new({module => 'Missing::Publisher'})};
+like($@, qr/unable to load publication module Missing::Publisher/,
+    'missing external module rejected');
+eval {ASPEER::Markdown::Publish->new({module => 'JSON::PP'})};
+like($@, qr/JSON::PP is not an ASPEER::Markdown::Publish subclass/,
+    'unrelated installed module rejected');
 
 #  A fresh interpreter loads permanent local preferences, then matching
 #  environment variables take precedence before constants are exported.

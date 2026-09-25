@@ -6,9 +6,9 @@ ASPEER::Markdown::Publish::Constant - publication defaults
 
 Defines `MARKDOWN_PUBLISH_MODULE`, `MARKDOWN_PUBLISH_CONFIG_FN`,
 `MARKDOWN_PUBLISH_OUTPUT_DN`, `MARKDOWN_PUBLISH_BRANCH`,
-`MARKDOWN_PUBLISH_REMOTE`, `MARKDOWN_PUBLISH_NPM_VERBOSE`,
-`MARKDOWN_PUBLISH_HOST`, and `MARKDOWN_PUBLISH_PORT`. Import individual scalar
-constants or use the default export set. The default publisher is
+`MARKDOWN_PUBLISH_NPM_VERBOSE`, `MARKDOWN_PUBLISH_HOST`, and
+`MARKDOWN_PUBLISH_PORT`. Import individual scalar constants or use the default
+export set. The default publisher is
 `ASPEER::Markdown::Publish::MkDocs`.
 
 An optional `Constant.pm.local` beside the installed module may return a hash

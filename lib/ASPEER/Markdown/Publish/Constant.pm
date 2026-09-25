@@ -21,7 +21,6 @@ $VERSION='0.001';
     MARKDOWN_PUBLISH_CONFIG_FN   => 'doc/project.json',
     MARKDOWN_PUBLISH_OUTPUT_DN   => 'site',
     MARKDOWN_PUBLISH_BRANCH      => 'gh-pages',
-    MARKDOWN_PUBLISH_REMOTE      => 'github',
     MARKDOWN_PUBLISH_NPM_VERBOSE => 0,
     MARKDOWN_PUBLISH_HOST        => undef,
     MARKDOWN_PUBLISH_PORT        => undef
@@ -64,9 +63,9 @@ ASPEER::Markdown::Publish::Constant - publication defaults
 
 Defines `MARKDOWN_PUBLISH_MODULE`, `MARKDOWN_PUBLISH_CONFIG_FN`,
 `MARKDOWN_PUBLISH_OUTPUT_DN`, `MARKDOWN_PUBLISH_BRANCH`,
-`MARKDOWN_PUBLISH_REMOTE`, `MARKDOWN_PUBLISH_NPM_VERBOSE`,
-`MARKDOWN_PUBLISH_HOST`, and `MARKDOWN_PUBLISH_PORT`. Import individual scalar
-constants or use the default export set. The default publisher is
+`MARKDOWN_PUBLISH_NPM_VERBOSE`, `MARKDOWN_PUBLISH_HOST`, and
+`MARKDOWN_PUBLISH_PORT`. Import individual scalar constants or use the default
+export set. The default publisher is
 `ASPEER::Markdown::Publish::MkDocs`.
 
 An optional `Constant.pm.local` beside the installed module may return a hash
@@ -101,9 +100,9 @@ ASPEER::Markdown::Publish::Constant - publication defaults
 
 Defines C<MARKDOWN_PUBLISH_MODULE>, C<MARKDOWN_PUBLISH_CONFIG_FN>,
 C<MARKDOWN_PUBLISH_OUTPUT_DN>, C<MARKDOWN_PUBLISH_BRANCH>,
-C<MARKDOWN_PUBLISH_REMOTE>, C<MARKDOWN_PUBLISH_NPM_VERBOSE>,
-C<MARKDOWN_PUBLISH_HOST>, and C<MARKDOWN_PUBLISH_PORT>. Import individual scalar
-constants or use the default export set. The default publisher is
+C<MARKDOWN_PUBLISH_NPM_VERBOSE>, C<MARKDOWN_PUBLISH_HOST>, and
+C<MARKDOWN_PUBLISH_PORT>. Import individual scalar constants or use the default
+export set. The default publisher is
 C<ASPEER::Markdown::Publish::MkDocs>.
 
 An optional C<Constant.pm.local> beside the installed module may return a hash

@@ -43,8 +43,10 @@ page becomes the home page in each engine; its original URL remains available.
 
 The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
 with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
-when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
-rather than nested beneath engine names:
+when it comes from a JSON file or MakeMaker metadata. The `mkdocs`, `vitepress`,
+`docusaurus`, and `starlight` shortcuts select the bundled publishers. A fully
+qualified name may select another installed subclass. Engine settings are
+flat, rather than nested beneath engine names:
 
 ```perl
 {
@@ -54,7 +56,6 @@ rather than nested beneath engine names:
     config  => 'doc/docusaurus/docusaurus.config.js',
     output  => 'site',
     branch  => 'gh-pages',
-    remote  => 'github',
     cloudflare => {config => 'wrangler.jsonc'},
 }
 ```
@@ -100,11 +101,11 @@ Reads a JSON configuration and constructs its selected engine.
 ## run
 
 Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
-site, updates the local publication branch, then pushes that branch to the
-configured remote. It defaults to a remote named `github` and fails if that
-remote does not exist. It is an explicit publishing action, not part of
-`build` or `serve`. `cloudflare` builds and deploys the static files to a
-Cloudflare Worker without committing or pushing Git.
+site and updates the local publication branch. It does not contact a remote;
+push the branch through the repository's normal Git workflow. It is an
+explicit publishing action, not part of `build` or `serve`. `cloudflare`
+builds and deploys the static files to a Cloudflare Worker without committing
+or pushing Git.
 
 ## source_directories
 
@@ -122,9 +123,8 @@ anchors moved into another generated page.
 
 ## publish_gh
 
-Builds, commits to a temporary worktree for the configured branch, and pushes
-that branch to the configured GitHub remote. It does not change the current
-checkout or force-push.
+Builds and commits to a temporary worktree for the configured local branch. It
+does not change the current checkout or contact a remote.
 
 ## publish_cloudflare
 

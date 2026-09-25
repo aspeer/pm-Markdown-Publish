@@ -44,6 +44,16 @@ $VERSION='0.001';
 my %ACTION=map {$_ => 1} qw(build serve gh cloudflare);
 
 
+#  Short names for the publisher classes supplied by this distribution
+#
+my %module_alias=(
+    mkdocs     => 'ASPEER::Markdown::Publish::MkDocs',
+    vitepress  => 'ASPEER::Markdown::Publish::VitePress',
+    docusaurus => 'ASPEER::Markdown::Publish::Docusaurus',
+    starlight  => 'ASPEER::Markdown::Publish::Starlight'
+);
+
+
 #  Done
 #
 1;
@@ -63,17 +73,22 @@ sub new {
                 unless keys(%{$opt_hr})==1;
             return $class->load_config($opt_hr->{'config_file'});
         }
-        my $module=defined($ENV{'MARKDOWN_PUBLISH_MODULE'}) ?
+        my $publisher=defined($ENV{'MARKDOWN_PUBLISH_MODULE'}) ?
             $ENV{'MARKDOWN_PUBLISH_MODULE'} :
             (exists($opt_hr->{'module'}) ? $opt_hr->{'module'} : $MARKDOWN_PUBLISH_MODULE);
-        die "invalid publication module: $module\n"
-            unless defined($module) &&
-                $module=~/^ASPEER::Markdown::Publish::[A-Za-z][A-Za-z0-9_]*$/;
-        (my $module_fn=$module)=~s{::}{/}g;
-        require "$module_fn.pm";
-        die "$module is not an ASPEER::Markdown::Publish subclass\n"
-            unless $module->isa(__PACKAGE__);
-        return $module->new($opt_hr);
+        die "publication module is not defined\n"
+            unless defined($publisher) && length($publisher);
+        $publisher=$module_alias{lc($publisher)} || $publisher;
+        (my $publisher_fn=$publisher)=~s{::}{/}g;
+        my $loaded=eval {
+            require "$publisher_fn.pm";
+            1;
+        };
+        die "unable to load publication module $publisher: $@"
+            unless $loaded;
+        die "$publisher is not an ASPEER::Markdown::Publish subclass\n"
+            unless $publisher->isa(__PACKAGE__);
+        return $publisher->new($opt_hr);
     }
     my $self=bless({%{$opt_hr}}, $class);
     return $self;
@@ -733,12 +748,11 @@ sub publish_gh {
 
 
     #  Build first, then replace only the disposable publication worktree.
-    #  This action explicitly includes the remote push.
+    #  Leave the resulting branch local so pushing remains an explicit Git
+    #  operation controlled by the repository's configured upstream.
     #
     my ($self)=@_;
     my $branch=$self->option('branch', $MARKDOWN_PUBLISH_BRANCH);
-    my $remote=$self->option('remote', $MARKDOWN_PUBLISH_REMOTE);
-    $self->command('git', 'remote', 'get-url', $remote);
     my $site_dn=$self->build();
     $self->command('git', 'check-ref-format', '--branch', $branch);
     my $temporary_dn=abs_path(tempdir(CLEANUP => 1));
@@ -765,7 +779,6 @@ sub publish_gh {
     my $error=$@;
     $self->command('git', 'worktree', 'remove', '--force', $work_dn);
     die $error unless $ok;
-    $self->command('git', 'push', $remote, $branch);
     return $branch;
 
 }
@@ -849,8 +862,10 @@ page becomes the home page in each engine; its original URL remains available.
 
 The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
 with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
-when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
-rather than nested beneath engine names:
+when it comes from a JSON file or MakeMaker metadata. The `mkdocs`, `vitepress`,
+`docusaurus`, and `starlight` shortcuts select the bundled publishers. A fully
+qualified name may select another installed subclass. Engine settings are
+flat, rather than nested beneath engine names:
 
 ```perl
 {
@@ -860,7 +875,6 @@ rather than nested beneath engine names:
     config  => 'doc/docusaurus/docusaurus.config.js',
     output  => 'site',
     branch  => 'gh-pages',
-    remote  => 'github',
     cloudflare => {config => 'wrangler.jsonc'},
 }
 ```
@@ -906,11 +920,11 @@ Reads a JSON configuration and constructs its selected engine.
 ## run
 
 Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
-site, updates the local publication branch, then pushes that branch to the
-configured remote. It defaults to a remote named `github` and fails if that
-remote does not exist. It is an explicit publishing action, not part of
-`build` or `serve`. `cloudflare` builds and deploys the static files to a
-Cloudflare Worker without committing or pushing Git.
+site and updates the local publication branch. It does not contact a remote;
+push the branch through the repository's normal Git workflow. It is an
+explicit publishing action, not part of `build` or `serve`. `cloudflare`
+builds and deploys the static files to a Cloudflare Worker without committing
+or pushing Git.
 
 ## source_directories
 
@@ -928,9 +942,8 @@ anchors moved into another generated page.
 
 ## publish_gh
 
-Builds, commits to a temporary worktree for the configured branch, and pushes
-that branch to the configured GitHub remote. It does not change the current
-checkout or force-push.
+Builds and commits to a temporary worktree for the configured local branch. It
+does not change the current checkout or contact a remote.
 
 ## publish_cloudflare
 
@@ -1000,13 +1013,12 @@ Makefile is needed; C<ASPEER::MakeMaker::Markdown::Publish> supplies optional
 MakeMaker targets.
 
 An existing C<doc/> directory is the default publication boundary. When it is
-assembled, Markdown beneath C<lib/> and C<bin/> is mirrored under those paths
-in the temporary site documents. A guide can link to
-C<lib/Example/Module.pm.md>. Mirrored pages are available through links but are
-not added to generated navigation. When C<doc/> is absent, sidecars become the
-default source pages. Set C<sources> explicitly to include other directories. Source
-files are never rewritten; assembly and engine-specific Markdown adjustments
-happen in temporary trees.
+assembled, Markdown beneath C<lib/> and C<bin/> is mirrored under those paths in
+the temporary site documents. A guide can link to C<lib/Example/Module.pm.md>.
+Mirrored pages are available through links but are not added to generated
+navigation. When C<doc/> is absent, sidecars become the default source pages.
+Set C<sources> explicitly to include other directories. Source files are never rewritten;
+assembly and engine-specific Markdown adjustments happen in temporary trees.
 Nested Markdown under C<doc/> remains available for links but does not appear
 in generated navigation. When no C<index.md> was authored, the first top-level
 page becomes the home page in each engine; its original URL remains available.
@@ -1016,8 +1028,10 @@ page becomes the home page in each engine; its original URL remains available.
 
 The default engine is C<ASPEER::Markdown::Publish::MkDocs>. Select another class
 with C<module>. C<MARKDOWN_PUBLISH_MODULE> overrides C<module>, including
-when it comes from a JSON file or MakeMaker metadata. Engine settings are flat,
-rather than nested beneath engine names:
+when it comes from a JSON file or MakeMaker metadata. The C<mkdocs>, C<vitepress>,
+C<docusaurus>, and C<starlight> shortcuts select the bundled publishers. A fully
+qualified name may select another installed subclass. Engine settings are
+flat, rather than nested beneath engine names:
 
 
  {
@@ -1027,7 +1041,6 @@ rather than nested beneath engine names:
      config  => 'doc/docusaurus/docusaurus.config.js',
      output  => 'site',
      branch  => 'gh-pages',
-     remote  => 'github',
      cloudflare => {config => 'wrangler.jsonc'},
  }
 The C<config> path and other engine-specific options are described by the
@@ -1073,11 +1086,11 @@ Reads a JSON configuration and constructs its selected engine.
 =head2 run
 
 Dispatches C<build>, C<serve>, C<gh>, or C<cloudflare>. C<gh> builds the
-site, updates the local publication branch, then pushes that branch to the
-configured remote. It defaults to a remote named C<github> and fails if that
-remote does not exist. It is an explicit publishing action, not part of
-C<build> or C<serve>. C<cloudflare> builds and deploys the static files to a
-Cloudflare Worker without committing or pushing Git.
+site and updates the local publication branch. It does not contact a remote;
+push the branch through the repository's normal Git workflow. It is an
+explicit publishing action, not part of C<build> or C<serve>. C<cloudflare>
+builds and deploys the static files to a Cloudflare Worker without committing
+or pushing Git.
 
 
 =head2 source_directories
@@ -1099,9 +1112,8 @@ anchors moved into another generated page.
 
 =head2 publish_gh
 
-Builds, commits to a temporary worktree for the configured branch, and pushes
-that branch to the configured GitHub remote. It does not change the current
-checkout or force-push.
+Builds and commits to a temporary worktree for the configured local branch. It
+does not change the current checkout or contact a remote.
 
 
 =head2 publish_cloudflare

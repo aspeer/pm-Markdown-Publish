@@ -11,7 +11,7 @@ generator required for the backend you use.
 ```sh
 markdown-publish build
 markdown-publish serve
-# Explicit GitHub publication:
+# Update the local publication branch:
 markdown-publish gh
 # Explicit Cloudflare Workers Static Assets deployment:
 markdown-publish cloudflare --config doc/project.json
@@ -33,21 +33,24 @@ available for links.
 
 MkDocs is the default engine. Select another with `module` in
 `doc/project.json` or with `--module`. `MARKDOWN_PUBLISH_MODULE`
-overrides either selection when set. For example,
-`MARKDOWN_PUBLISH_MODULE=ASPEER::Markdown::Publish::VitePress markdown-publish build`.
+overrides either selection when set. The `mkdocs`, `vitepress`, `docusaurus`,
+and `starlight` shortcuts select the bundled publishers. A fully qualified
+class name may select another installed `ASPEER::Markdown::Publish` subclass.
+For example, `MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve`.
 The constants in `ASPEER::Markdown::Publish::Constant` may also be overridden
 by matching environment variables or an adjacent `Constant.pm.local` file.
 Settings include source directories, engine configuration path, output
-directory, publication branch, remote, and executable names.
+directory, publication branch, and executable names.
 For npm-based engines, installation start and completion are always reported.
 Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
 To listen on another interface and port with any publisher, run
 `MARKDOWN_PUBLISH_HOST=0.0.0.0 MARKDOWN_PUBLISH_PORT=8002 make publish_serve`.
 Without these settings, each publisher keeps its existing local server address.
 
-The HTML output defaults to `site/`. `gh` requires an existing Git commit,
-configured author identity, and a GitHub remote named `github` by default. It
-updates `gh-pages` through a temporary worktree and pushes the result.
+The HTML output defaults to `site/`. `gh` requires an existing Git commit and
+configured author identity. It updates the local `gh-pages` branch through a
+temporary worktree without contacting a remote. Push that branch through the
+repository's normal Git workflow when it is ready.
 
 For Workers Static Assets, set `cloudflare.config` in `doc/project.json` to a
 dedicated Wrangler configuration file. The `cloudflare` action builds the
