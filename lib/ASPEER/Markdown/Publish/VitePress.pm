@@ -71,6 +71,7 @@ sub prepare {
         } @{$navigation_ar};
         my $config="export default {\n  title: ".
             encode_json($self->option('name', 'Documentation')).
+            ",\n  base: ".encode_json($self->site_base('/')).
             ",\n  themeConfig: {\n    sidebar: [\n".
             join(",\n", @items)."\n    ]\n  }\n};\n";
         $prepared_config_fn=File::Spec->catfile($config_dn, 'config.mts');
@@ -143,7 +144,9 @@ Set `config` to an authored VitePress configuration; its original location is
 preserved for relative imports. `npm`, `version`, `host`, `port`, and `output`
 customise operation. `prepare` returns the temporary root, documentation
 directory, and configuration path; `build` returns the site directory; `serve`
-runs the foreground server.
+runs the foreground server. For generated configuration, `base` sets
+VitePress's deployment base path. An authored configuration remains
+authoritative.
 
 # SEE ALSO
 
@@ -172,7 +175,9 @@ Set C<config> to an authored VitePress configuration; its original location is
 preserved for relative imports. C<npm>, C<version>, C<host>, C<port>, and C<output>
 customise operation. C<prepare> returns the temporary root, documentation
 directory, and configuration path; C<build> returns the site directory; C<serve>
-runs the foreground server.
+runs the foreground server. For generated configuration, C<base> sets
+VitePress's deployment base path. An authored configuration remains
+authoritative.
 
 
 =head1 SEE ALSO

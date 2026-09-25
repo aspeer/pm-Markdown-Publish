@@ -98,6 +98,7 @@ sub prepare {
             "import starlight from '\@astrojs/starlight';\n\n".
             "import localLinks from './local-links.mjs';\n\n".
             "export default defineConfig({\n".
+            "  base: ".encode_json($self->site_base('/')).",\n".
             "  markdown: { processor: unified({ remarkPlugins: [localLinks] }) },\n".
             "  integrations: [starlight({\n    title: ".
             encode_json($self->option('name', 'Documentation')).
@@ -288,7 +289,8 @@ Starlight project. Set `config` to an authored Astro configuration, or let the
 engine create one. `npm`, `astro_version`, `starlight_version`, `host`, `port`,
 and `output` customise operation. `prepare` returns the temporary root,
 project directory, and configuration path; `build` returns the site directory;
-`serve` runs the foreground server.
+`serve` runs the foreground server. For generated configuration, `base` sets
+Astro's deployment base path. An authored configuration remains authoritative.
 Local Markdown links such as `lib/Example/Module.pm.md` are resolved to the
 corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must
@@ -320,7 +322,8 @@ Starlight project. Set C<config> to an authored Astro configuration, or let the
 engine create one. C<npm>, C<astro_version>, C<starlight_version>, C<host>, C<port>,
 and C<output> customise operation. C<prepare> returns the temporary root,
 project directory, and configuration path; C<build> returns the site directory;
-C<serve> runs the foreground server.
+C<serve> runs the foreground server. For generated configuration, C<base> sets
+Astro's deployment base path. An authored configuration remains authoritative.
 Local Markdown links such as C<lib/Example/Module.pm.md> are resolved to the
 corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must

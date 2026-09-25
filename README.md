@@ -40,7 +40,10 @@ For example, `MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve`.
 The constants in `ASPEER::Markdown::Publish::Constant` may also be overridden
 by matching environment variables or an adjacent `Constant.pm.local` file.
 Settings include source directories, engine configuration path, output
-directory, publication branch, and executable names.
+directory, publication branch, deployment base, and executable names. For
+generated VitePress, Docusaurus, and Starlight configuration, `base` maps to
+the engine's deployment base path; an authored engine configuration remains
+authoritative.
 For npm-based engines, installation start and completion are always reported.
 Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
 To listen on another interface and port with any publisher, run
@@ -50,7 +53,10 @@ Without these settings, each publisher keeps its existing local server address.
 The HTML output defaults to `site/`. `gh` requires an existing Git commit and
 configured author identity. It updates the local `gh-pages` branch through a
 temporary worktree without contacting a remote. Push that branch through the
-repository's normal Git workflow when it is ready.
+repository's normal Git workflow when it is ready. If `base` is not configured,
+`gh` derives `/<repository>/` from `origin`, or `/` for an
+`<owner>.github.io` repository. Set `base` explicitly when the published URL
+uses a different path.
 
 For Workers Static Assets, set `cloudflare.config` in `doc/project.json` to a
 dedicated Wrangler configuration file. The `cloudflare` action builds the

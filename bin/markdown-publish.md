@@ -26,6 +26,9 @@ no configuration file is used. Otherwise put `module` in the JSON configuration.
 selected with `mkdocs`, `vitepress`, `docusaurus`, or `starlight`; a fully
 qualified name may select another installed subclass. Without `--config`, an
 existing `doc/project.json` is read automatically. Other options are repeatable
-`--source DIRECTORY`, `--name`, `--output`, and `--branch`.
+`--source DIRECTORY`, `--name`, `--base`, `--output`, and `--branch`. The base
+must begin and end with `/`. For `gh`, it defaults to the path implied by the
+`origin` repository name: `/<repository>/`, or `/` for an `<owner>.github.io`
+repository.
 
 `--version` prints the installed program version.

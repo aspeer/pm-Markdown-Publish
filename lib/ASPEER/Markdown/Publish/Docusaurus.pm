@@ -78,7 +78,9 @@ sub prepare {
     else {
         my $config="module.exports = {\n  title: ".
             encode_json($self->option('name', 'Documentation')).
-            ",\n  url: 'http://localhost',\n  baseUrl: '/',\n  onBrokenLinks: 'warn',\n".
+            ",\n  url: 'http://localhost',\n  baseUrl: ".
+            encode_json($self->site_base('/')).
+            ",\n  onBrokenLinks: 'warn',\n".
             "  markdown: { format: 'detect' },\n".
             "  presets: [['classic', { docs: { routeBasePath: '/', sidebarPath: require.resolve('./sidebars.js') }, blog: false }]],\n};\n";
         $prepared_config_fn=File::Spec->catfile($site_dn, 'docusaurus.config.js');
@@ -166,7 +168,8 @@ Docusaurus project. Set `config` to an authored Docusaurus configuration, or
 let the engine create one. `npm`, `version`, `host`, `port`, and `output`
 customise operation. `prepare` returns the temporary root, project directory,
 and configuration path; `build` returns the site directory; `serve` runs the
-foreground server.
+foreground server. For generated configuration, `base` sets Docusaurus's
+`baseUrl`. An authored configuration remains authoritative.
 
 # SEE ALSO
 
@@ -194,7 +197,8 @@ Docusaurus project. Set C<config> to an authored Docusaurus configuration, or
 let the engine create one. C<npm>, C<version>, C<host>, C<port>, and C<output>
 customise operation. C<prepare> returns the temporary root, project directory,
 and configuration path; C<build> returns the site directory; C<serve> runs the
-foreground server.
+foreground server. For generated configuration, C<base> sets Docusaurus's
+C<baseUrl>. An authored configuration remains authoritative.
 
 
 =head1 SEE ALSO

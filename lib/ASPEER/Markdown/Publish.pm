@@ -23,6 +23,7 @@ use warnings;
 #  Core and external packages
 #
 use Cwd qw(abs_path getcwd);
+use File::Basename qw(basename);
 use File::Copy qw(copy);
 use File::Find ();
 use File::Path qw(make_path);
@@ -129,6 +130,62 @@ sub option {
     my ($self, $name, $default)=@_;
     return $self->{$name} if exists($self->{$name});
     return $default;
+
+}
+
+
+sub site_base {
+
+    my ($self, $default)=@_;
+    my $base=exists($self->{'base'}) ? $self->{'base'} : $default;
+    return undef unless defined($base);
+    die "publication base must start and end with / and contain no empty or dot segments\n"
+        if ref($base) || !length($base) || $base!~m{\A/} || $base!~m{/\z} ||
+            $base=~m{//} || $base=~m{(?:\A|/)\.\.?/} || $base=~m{[\s?#]};
+    return $base;
+
+}
+
+
+sub github_repository_name {
+
+    my ($self)=@_;
+    my $remote;
+    eval {$remote=$self->command('git', 'config', '--get', 'remote.origin.url')};
+    if (defined($remote) && length($remote)) {
+        $remote=~s/[\r\n]+\z//;
+        $remote=~s{[/\\]+\z}{};
+        $remote=~s{\.git\z}{}i;
+        if ($remote=~m{([^/\\:]+)\z}) {
+            my $repository=$1;
+            return $repository if $repository=~/\A[A-Za-z0-9._-]+\z/;
+        }
+    }
+    my $root_dn=$self->command('git', 'rev-parse', '--show-toplevel');
+    $root_dn=~s/[\r\n]+\z//;
+    my $repository=basename($root_dn);
+    die "unable to determine GitHub repository name\n"
+        unless defined($repository) && $repository=~/\A[A-Za-z0-9._-]+\z/;
+    return $repository;
+
+}
+
+
+sub github_base {
+
+    my ($self)=@_;
+    my $repository=$self->github_repository_name();
+    return '/' if $repository=~/\.github\.io\z/i;
+    return "/$repository/";
+
+}
+
+
+sub github_site_base {
+
+    my ($self)=@_;
+    return $self->site_base('/') if exists($self->{'base'});
+    return $self->github_base();
 
 }
 
@@ -753,6 +810,8 @@ sub publish_gh {
     #
     my ($self)=@_;
     my $branch=$self->option('branch', $MARKDOWN_PUBLISH_BRANCH);
+    my $base=$self->github_site_base();
+    local $self->{'base'}=$base;
     my $site_dn=$self->build();
     $self->command('git', 'check-ref-format', '--branch', $branch);
     my $temporary_dn=abs_path(tempdir(CLEANUP => 1));
@@ -885,6 +944,11 @@ containing the settings directly, under `publish`, or under
 `x_documentation.publish`. `new({config_file => $filename})` is equivalent.
 Do not combine `config_file` with inline settings.
 
+`base` sets the deployment path for generated VitePress, Docusaurus, and
+Starlight configuration. It must begin and end with `/`; for example,
+`base => '/example/'`. An authored engine configuration remains authoritative
+for its own base path.
+
 For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
 ```jsonc
@@ -943,7 +1007,13 @@ anchors moved into another generated page.
 ## publish_gh
 
 Builds and commits to a temporary worktree for the configured local branch. It
-does not change the current checkout or contact a remote.
+does not change the current checkout or contact a remote. When `base` is not
+configured, this action derives it from the `origin` repository name. A normal
+project repository uses `/<repository>/`, while a repository named
+`<owner>.github.io` uses `/`. If `origin` is unavailable, the Git top-level
+directory name is used. This inferred value applies only to the GitHub Pages
+build; ordinary builds, local preview, and Cloudflare publication keep their
+normal base path.
 
 ## publish_cloudflare
 
@@ -1049,6 +1119,11 @@ containing the settings directly, under C<publish>, or under
 C<x_documentation.publish>. C<<< new({config_file => $filename}) >>> is equivalent.
 Do not combine C<config_file> with inline settings.
 
+C<base> sets the deployment path for generated VitePress, Docusaurus, and
+Starlight configuration. It must begin and end with C</>; for example,
+C<<< base => '/example/' >>>. An authored engine configuration remains authoritative
+for its own base path.
+
 For a static documentation Worker, a minimal authored C<wrangler.jsonc> is:
 
 
@@ -1113,7 +1188,13 @@ anchors moved into another generated page.
 =head2 publish_gh
 
 Builds and commits to a temporary worktree for the configured local branch. It
-does not change the current checkout or contact a remote.
+does not change the current checkout or contact a remote. When C<base> is not
+configured, this action derives it from the C<origin> repository name. A normal
+project repository uses C<<< /<repository>/ >>>, while a repository named
+C<<< <owner>.github.io >>> uses C</>. If C<origin> is unavailable, the Git top-level
+directory name is used. This inferred value applies only to the GitHub Pages
+build; ordinary builds, local preview, and Cloudflare publication keep their
+normal base path.
 
 
 =head2 publish_cloudflare

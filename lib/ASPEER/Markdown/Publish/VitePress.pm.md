@@ -18,7 +18,9 @@ Set `config` to an authored VitePress configuration; its original location is
 preserved for relative imports. `npm`, `version`, `host`, `port`, and `output`
 customise operation. `prepare` returns the temporary root, documentation
 directory, and configuration path; `build` returns the site directory; `serve`
-runs the foreground server.
+runs the foreground server. For generated configuration, `base` sets
+VitePress's deployment base path. An authored configuration remains
+authoritative.
 
 # SEE ALSO
 

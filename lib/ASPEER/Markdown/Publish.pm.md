@@ -66,6 +66,11 @@ containing the settings directly, under `publish`, or under
 `x_documentation.publish`. `new({config_file => $filename})` is equivalent.
 Do not combine `config_file` with inline settings.
 
+`base` sets the deployment path for generated VitePress, Docusaurus, and
+Starlight configuration. It must begin and end with `/`; for example,
+`base => '/example/'`. An authored engine configuration remains authoritative
+for its own base path.
+
 For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
 ```jsonc
@@ -124,7 +129,13 @@ anchors moved into another generated page.
 ## publish_gh
 
 Builds and commits to a temporary worktree for the configured local branch. It
-does not change the current checkout or contact a remote.
+does not change the current checkout or contact a remote. When `base` is not
+configured, this action derives it from the `origin` repository name. A normal
+project repository uses `/<repository>/`, while a repository named
+`<owner>.github.io` uses `/`. If `origin` is unavailable, the Git top-level
+directory name is used. This inferred value applies only to the GitHub Pages
+build; ordinary builds, local preview, and Cloudflare publication keep their
+normal base path.
 
 ## publish_cloudflare
 

@@ -165,9 +165,13 @@ Term
 : remains example text
 ```
 MARKDOWN
-$publish_or=ASPEER::Markdown::Publish::VitePress->new({sources => ['doc']});
+$publish_or=ASPEER::Markdown::Publish::VitePress->new({
+    sources => ['doc'], base => '/sample-docs/'
+});
 my (undef, $generated_vitepress_dn, $generated_vitepress_fn)=$publish_or->prepare();
 my $vitepress_config=slurp($generated_vitepress_fn);
+like($vitepress_config, qr/^  base: "\/sample-docs\/",$/m,
+    'generated VitePress configuration uses the publication base');
 like($vitepress_config, qr/text: "First Chapter", link: "\/"/,
     'VitePress home and first sidebar entry use the first split section');
 like($vitepress_config,
@@ -202,9 +206,13 @@ is($vitepress_config_fn, abs_path('config/vitepress.mts'),
 
 blurp('config/docusaurus.js', "module.exports = { title: 'Custom' };\n");
 blurp('doc/guide.md', "# Guide {#guide}\n\nText.\n");
-$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({sources => ['doc']});
+$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
+    sources => ['doc'], base => '/sample-docs/'
+});
 my (undef, $generated_docusaurus_dn, $generated_docusaurus_fn)=
     $publish_or->prepare();
+like(slurp($generated_docusaurus_fn), qr/^  baseUrl: "\/sample-docs\/",$/m,
+    'generated Docusaurus configuration uses the publication base');
 like(slurp($generated_docusaurus_fn), qr/markdown: \{ format: 'detect' \}/,
     'generated Docusaurus project enables CommonMark detection');
 my $docusaurus_sidebar=slurp("$generated_docusaurus_dn/sidebars.js");
@@ -243,9 +251,13 @@ like(slurp("$docusaurus_dn/docs/guide.md"), qr/<a id="guide"><\/a>/,
 
 blurp('config/astro.mjs', "export default {};\n");
 blurp('doc/ModuleName.md', "# Mixed Case Module\n\nText.\n");
-$publish_or=ASPEER::Markdown::Publish::Starlight->new({sources => ['doc']});
+$publish_or=ASPEER::Markdown::Publish::Starlight->new({
+    sources => ['doc'], base => '/sample-docs/'
+});
 my (undef, $generated_starlight_dn, $generated_starlight_fn)=$publish_or->prepare();
 my $starlight_config=slurp($generated_starlight_fn);
+like($starlight_config, qr/^  base: "\/sample-docs\/",$/m,
+    'generated Starlight configuration uses the publication base');
 like($starlight_config, qr/processor: unified\(\{ remarkPlugins: \[localLinks\] \}\)/,
     'Starlight uses its local Markdown link resolver');
 like(slurp("$generated_starlight_dn/local-links.mjs"),
@@ -288,6 +300,41 @@ like(slurp($starlight_config_fn), qr/mergeConfig\(authored, \{ markdown: \{ proc
 my $authored_starlight_config_fn=abs_path('config/astro.mjs');
 like(slurp($starlight_config_fn), qr/\Q$authored_starlight_config_fn\E/,
     'temporary configuration imports the authored configuration');
+
+eval {ASPEER::Markdown::Publish::VitePress->new({
+    sources => ['doc'], base => 'sample-docs'
+})->prepare()};
+like($@, qr/publication base must start and end with/,
+    'invalid publication base rejected');
+
+{
+    package TestGitHubBase;
+    use vars qw(@ISA);
+    @ISA=qw(ASPEER::Markdown::Publish);
+    sub command {
+        my ($self, @command)=@_;
+        return $self->{'remote'} if $command[1] eq 'config' && exists($self->{'remote'});
+        die "remote unavailable\n" if $command[1] eq 'config';
+        return $self->{'root'} if $command[1] eq 'rev-parse';
+        die "unexpected command: @command\n";
+    }
+}
+is(TestGitHubBase->new({
+    remote => "gitea\@example.invalid:aspeer/pm-Sample.git\n"
+})->github_site_base(), '/pm-Sample/',
+    'GitHub base derives from the origin repository name');
+is(TestGitHubBase->new({
+    remote => "https://example.invalid/aspeer/aspeer.github.io.git\n"
+})->github_site_base(), '/',
+    'GitHub account site uses the root base');
+is(TestGitHubBase->new({
+    root => "/tmp/fallback-repository\n"
+})->github_site_base(), '/fallback-repository/',
+    'GitHub base falls back to the checkout directory name');
+is(TestGitHubBase->new({
+    base => '/configured/', remote => "gitea\@example.invalid:aspeer/ignored.git\n"
+})->github_site_base(), '/configured/',
+    'explicit publication base overrides GitHub inference');
 
 SKIP: {
     skip 'set STARLIGHT_TEST=1 to run a real Astro build', 4

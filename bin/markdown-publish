@@ -19,6 +19,7 @@ sub main {
         'config=s'  => \$opt{'config'},
         'source=s'  => \@source_dn,
         'name=s'    => \$opt{'name'},
+        'base=s'    => \$opt{'base'},
         'output=s'  => \$opt{'output'},
         'branch=s'  => \$opt{'branch'},
         'version'   => \$opt{'version'},
@@ -51,7 +52,7 @@ sub main {
         $publish_or=ASPEER::Markdown::Publish->new(\%config);
     }
     $publish_or->{'sources'}=\@source_dn if @source_dn;
-    foreach my $name (qw(name output branch)) {
+    foreach my $name (qw(name base output branch)) {
         $publish_or->{$name}=$opt{$name} if defined($opt{$name});
     }
     $publish_or->run($action);
@@ -94,7 +95,10 @@ no configuration file is used. Otherwise put `module` in the JSON configuration.
 selected with `mkdocs`, `vitepress`, `docusaurus`, or `starlight`; a fully
 qualified name may select another installed subclass. Without `--config`, an
 existing `doc/project.json` is read automatically. Other options are repeatable
-`--source DIRECTORY`, `--name`, `--output`, and `--branch`.
+`--source DIRECTORY`, `--name`, `--base`, `--output`, and `--branch`. The base
+must begin and end with `/`. For `gh`, it defaults to the path implied by the
+`origin` repository name: `/<repository>/`, or `/` for an `<owner>.github.io`
+repository.
 
 `--version` prints the installed program version.
 
@@ -128,7 +132,10 @@ C<MARKDOWN_PUBLISH_MODULE> overrides either selection. Bundled publishers may be
 selected with C<mkdocs>, C<vitepress>, C<docusaurus>, or C<starlight>; a fully
 qualified name may select another installed subclass. Without C<--config>, an
 existing C<doc/project.json> is read automatically. Other options are repeatable
-C<--source DIRECTORY>, C<--name>, C<--output>, and C<--branch>.
+C<--source DIRECTORY>, C<--name>, C<--base>, C<--output>, and C<--branch>. The base
+must begin and end with C</>. For C<gh>, it defaults to the path implied by the
+C<origin> repository name: C<<< /<repository>/ >>>, or C</> for an C<<< <owner>.github.io >>>
+repository.
 
 C<--version> prints the installed program version.
 

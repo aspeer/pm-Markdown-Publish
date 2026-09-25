@@ -17,7 +17,8 @@ Starlight project. Set `config` to an authored Astro configuration, or let the
 engine create one. `npm`, `astro_version`, `starlight_version`, `host`, `port`,
 and `output` customise operation. `prepare` returns the temporary root,
 project directory, and configuration path; `build` returns the site directory;
-`serve` runs the foreground server.
+`serve` runs the foreground server. For generated configuration, `base` sets
+Astro's deployment base path. An authored configuration remains authoritative.
 Local Markdown links such as `lib/Example/Module.pm.md` are resolved to the
 corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must
