@@ -22,6 +22,19 @@ runs the foreground server. For generated configuration, `base` sets
 VitePress's deployment base path. An authored configuration remains
 authoritative.
 
+Set `config_extend` to an ECMAScript module whose default export is a function
+accepting `(config, context)`. It may return the generated configuration after
+adding VitePress settings; synchronous and asynchronous functions are accepted.
+The context contains the generated publication name, base, output, pages, and
+navigation. `config` and `config_extend` cannot be combined.
+
+```javascript
+export default (config) => ({
+  ...config,
+  themeConfig: {...config.themeConfig, search: {provider: 'local'}},
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`

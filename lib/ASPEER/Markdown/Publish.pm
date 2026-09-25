@@ -42,7 +42,7 @@ $VERSION='0.001';
 
 #  Supported publication actions
 #
-my %ACTION=map {$_ => 1} qw(build serve gh cloudflare);
+my %ACTION=map {$_ => 1} qw(build serve gh gh-push cloudflare);
 
 
 #  Short names for the publisher classes supplied by this distribution
@@ -134,6 +134,37 @@ sub option {
 }
 
 
+sub configuration_files {
+
+    my ($self)=@_;
+    my $config_fn=$self->option('config', undef);
+    my $extend_fn=$self->option('config_extend', undef);
+    my $has_config=defined($config_fn) && length($config_fn);
+    my $has_extend=defined($extend_fn) && length($extend_fn);
+    die "config and config_extend cannot be combined\n"
+        if $has_config && $has_extend;
+    return ($has_config ? $config_fn : undef,
+        $has_extend ? $extend_fn : undef);
+
+}
+
+
+sub configuration_context {
+
+    my ($self, $pages_ar, $navigation_ar)=@_;
+    $pages_ar=[] unless defined($pages_ar);
+    $navigation_ar=[] unless defined($navigation_ar);
+    return {
+        name       => $self->option('name', 'Documentation'),
+        base       => $self->site_base('/'),
+        output     => $self->option('output', $MARKDOWN_PUBLISH_OUTPUT_DN),
+        pages      => [@{$pages_ar}],
+        navigation => [map {{%{$_}}} @{$navigation_ar}]
+    };
+
+}
+
+
 sub site_base {
 
     my ($self, $default)=@_;
@@ -207,6 +238,7 @@ sub run {
     return $self->build() if $action eq 'build';
     return $self->serve() if $action eq 'serve';
     return $self->publish_gh() if $action eq 'gh';
+    return $self->publish_gh_push() if $action eq 'gh-push';
     return $self->publish_cloudflare();
 
 }
@@ -681,6 +713,8 @@ sub markdown_title {
             }
             elsif (!$fence && $line=~/^#\s+(.+?)\s*$/) {
                 $title=$1;
+                $title=~s/\s+\{#[^}]+\}\s*$//;
+                $title=~s/[ \t]+#+[ \t]*$//;
                 last;
             }
         }
@@ -843,6 +877,20 @@ sub publish_gh {
 }
 
 
+sub publish_gh_push {
+
+
+    #  Keep local branch creation in publish_gh(), then make the remote side
+    #  effect explicit by pushing only the resulting branch to origin.
+    #
+    my ($self)=@_;
+    my $branch=$self->publish_gh();
+    $self->command('git', 'push', 'origin', $branch);
+    return $branch;
+
+}
+
+
 sub publish_cloudflare {
 
 
@@ -894,6 +942,7 @@ my $publish_or=ASPEER::Markdown::Publish->new({
 $publish_or->run('build');
 $publish_or->run('serve');
 $publish_or->run('gh');
+$publish_or->run('gh-push');
 $publish_or->run('cloudflare');
 ```
 
@@ -949,6 +998,19 @@ Starlight configuration. It must begin and end with `/`; for example,
 `base => '/example/'`. An authored engine configuration remains authoritative
 for its own base path.
 
+Set `config_extend` instead of `config` to customise a generated configuration.
+The two settings cannot be combined. MkDocs inherits the supplied YAML file.
+VitePress and Starlight load an ECMAScript module whose default export is a
+function; Docusaurus loads a CommonJS module exporting a synchronous function.
+Each function receives the generated configuration followed by a context object
+containing `name`, `base`, `output`, `pages`, and `navigation`, and must return
+the configuration to use.
+
+VitePress and Docusaurus receive their native configuration object. Starlight
+receives `{astro, starlight}` so its Astro settings and the options passed to
+the Starlight integration can be extended separately. Generated values remain
+in effect unless the function explicitly replaces them.
+
 For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
 ```jsonc
@@ -983,10 +1045,12 @@ Reads a JSON configuration and constructs its selected engine.
 
 ## run
 
-Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
+Dispatches `build`, `serve`, `gh`, `gh-push`, or `cloudflare`. `gh` builds the
 site and updates the local publication branch. It does not contact a remote;
-push the branch through the repository's normal Git workflow. It is an
-explicit publishing action, not part of `build` or `serve`. `cloudflare`
+push the branch through the repository's normal Git workflow. `gh-push`
+performs the same build and local branch update, then pushes that branch to
+`origin`. These are explicit publishing actions, not part of `build` or
+`serve`. `cloudflare`
 builds and deploys the static files to a Cloudflare Worker without committing
 or pushing Git.
 
@@ -1014,6 +1078,11 @@ project repository uses `/<repository>/`, while a repository named
 directory name is used. This inferred value applies only to the GitHub Pages
 build; ordinary builds, local preview, and Cloudflare publication keep their
 normal base path.
+
+## publish_gh_push
+
+Runs `publish_gh`, then pushes the resulting publication branch to `origin`.
+It does not force the update or push any other branch.
 
 ## publish_cloudflare
 
@@ -1071,6 +1140,7 @@ ASPEER::Markdown::Publish - common documentation publication operations
  $publish_or->run('build');
  $publish_or->run('serve');
  $publish_or->run('gh');
+ $publish_or->run('gh-push');
  $publish_or->run('cloudflare');
 
 =head1 DESCRIPTION
@@ -1124,6 +1194,19 @@ Starlight configuration. It must begin and end with C</>; for example,
 C<<< base => '/example/' >>>. An authored engine configuration remains authoritative
 for its own base path.
 
+Set C<config_extend> instead of C<config> to customise a generated configuration.
+The two settings cannot be combined. MkDocs inherits the supplied YAML file.
+VitePress and Starlight load an ECMAScript module whose default export is a
+function; Docusaurus loads a CommonJS module exporting a synchronous function.
+Each function receives the generated configuration followed by a context object
+containing C<name>, C<base>, C<output>, C<pages>, and C<navigation>, and must return
+the configuration to use.
+
+VitePress and Docusaurus receive their native configuration object. Starlight
+receives C<{astro, starlight}> so its Astro settings and the options passed to
+the Starlight integration can be extended separately. Generated values remain
+in effect unless the function explicitly replaces them.
+
 For a static documentation Worker, a minimal authored C<wrangler.jsonc> is:
 
 
@@ -1160,10 +1243,12 @@ Reads a JSON configuration and constructs its selected engine.
 
 =head2 run
 
-Dispatches C<build>, C<serve>, C<gh>, or C<cloudflare>. C<gh> builds the
+Dispatches C<build>, C<serve>, C<gh>, C<gh-push>, or C<cloudflare>. C<gh> builds the
 site and updates the local publication branch. It does not contact a remote;
-push the branch through the repository's normal Git workflow. It is an
-explicit publishing action, not part of C<build> or C<serve>. C<cloudflare>
+push the branch through the repository's normal Git workflow. C<gh-push>
+performs the same build and local branch update, then pushes that branch to
+C<origin>. These are explicit publishing actions, not part of C<build> or
+C<serve>. C<cloudflare>
 builds and deploys the static files to a Cloudflare Worker without committing
 or pushing Git.
 
@@ -1195,6 +1280,12 @@ C<<< <owner>.github.io >>> uses C</>. If C<origin> is unavailable, the Git top-l
 directory name is used. This inferred value applies only to the GitHub Pages
 build; ordinary builds, local preview, and Cloudflare publication keep their
 normal base path.
+
+
+=head2 publish_gh_push
+
+Runs C<publish_gh>, then pushes the resulting publication branch to C<origin>.
+It does not force the update or push any other branch.
 
 
 =head2 publish_cloudflare

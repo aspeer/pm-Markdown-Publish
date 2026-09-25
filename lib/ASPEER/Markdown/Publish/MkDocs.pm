@@ -43,13 +43,17 @@ $VERSION='0.001';
 sub prepare {
 
     my ($self, $preview)=@_;
-    my $config_fn=$self->option('config', undef);
-    $config_fn='mkdocs.yml' if !defined($config_fn) && -f 'mkdocs.yml';
+    my ($config_fn, $extend_fn)=$self->configuration_files();
+    die "config_extend cannot be used with direct MkDocs configuration\n"
+        if defined($extend_fn) && $self->option('config_mode', '') eq 'direct';
+    $config_fn='mkdocs.yml'
+        if !defined($config_fn) && !defined($extend_fn) && -f 'mkdocs.yml';
     if (defined($config_fn) && length($config_fn) &&
         ($self->option('config_mode', '') eq 'direct' || $config_fn eq 'mkdocs.yml')) {
         die "MkDocs configuration not found: $config_fn\n" unless -f $config_fn;
         return abs_path($config_fn);
     }
+    $config_fn=$extend_fn if defined($extend_fn);
     $config_fn='doc/mkdocs/mkdocs.yml'
         if !defined($config_fn) && -f 'doc/mkdocs/mkdocs.yml';
 
@@ -137,6 +141,10 @@ owns that layout. `command`, `strict`, `address`, and `output` customise the
 build and local server. `prepare($preview)` returns the configuration path;
 `build` returns the site directory; `serve` runs the foreground server.
 
+`config_extend` explicitly selects a supplemental YAML file for inheritance.
+It cannot be combined with `config` or direct mode. The publisher retains
+control of the assembled `docs_dir`, `site_dir`, and generated navigation.
+
 When no home page is authored, the first top-level assembled page is also used
 for `index.md`. Its original URL remains available for existing links.
 
@@ -168,6 +176,10 @@ and navigation. Set C<<< config_mode => 'direct' >>> when an authored file alrea
 owns that layout. C<command>, C<strict>, C<address>, and C<output> customise the
 build and local server. C<prepare($preview)> returns the configuration path;
 C<build> returns the site directory; C<serve> runs the foreground server.
+
+C<config_extend> explicitly selects a supplemental YAML file for inheritance.
+It cannot be combined with C<config> or direct mode. The publisher retains
+control of the assembled C<docs_dir>, C<site_dir>, and generated navigation.
 
 When no home page is authored, the first top-level assembled page is also used
 for C<index.md>. Its original URL remains available for existing links.

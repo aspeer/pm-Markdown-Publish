@@ -57,7 +57,7 @@ sub prepare {
         encode_json($package_hr));
     my $config_dn=File::Spec->catdir($docs_dn, '.vitepress');
     make_path($config_dn);
-    my $config_fn=$self->option('config', undef);
+    my ($config_fn, $extend_fn)=$self->configuration_files();
     my $prepared_config_fn;
     if (defined($config_fn) && length($config_fn)) {
         die "VitePress configuration not found: $config_fn\n" unless -f $config_fn;
@@ -69,11 +69,30 @@ sub prepare {
             "          { text: ".encode_json($_->{'title'}).
                 ", link: ".encode_json($link)." }"
         } @{$navigation_ar};
-        my $config="export default {\n  title: ".
+        my $generated="{\n  title: ".
             encode_json($self->option('name', 'Documentation')).
             ",\n  base: ".encode_json($self->site_base('/')).
             ",\n  themeConfig: {\n    sidebar: [\n".
-            join(",\n", @items)."\n    ]\n  }\n};\n";
+            join(",\n", @items)."\n    ]\n  }\n}";
+        my $config;
+        if (defined($extend_fn)) {
+            die "VitePress configuration extension not found: $extend_fn\n"
+                unless -f $extend_fn;
+            my $context_hr=$self->configuration_context($pages_ar, $navigation_ar);
+            my $authored_fn=abs_path($extend_fn);
+            $config="import { pathToFileURL } from 'node:url';\n\n".
+                "const generated = $generated;\n".
+                "const context = ".encode_json($context_hr).";\n".
+                "const extend = (await import(pathToFileURL(".
+                encode_json($authored_fn).").href)).default;\n".
+                "if (typeof extend !== 'function') throw new Error('VitePress config_extend must export a default function');\n".
+                "const configured = await extend(generated, context);\n".
+                "if (!configured || typeof configured !== 'object' || Array.isArray(configured)) throw new Error('VitePress config_extend must return a configuration object');\n".
+                "export default configured;\n";
+        }
+        else {
+            $config="export default $generated;\n";
+        }
         $prepared_config_fn=File::Spec->catfile($config_dn, 'config.mts');
         $self->write_file($prepared_config_fn, $config);
     }
@@ -148,6 +167,19 @@ runs the foreground server. For generated configuration, `base` sets
 VitePress's deployment base path. An authored configuration remains
 authoritative.
 
+Set `config_extend` to an ECMAScript module whose default export is a function
+accepting `(config, context)`. It may return the generated configuration after
+adding VitePress settings; synchronous and asynchronous functions are accepted.
+The context contains the generated publication name, base, output, pages, and
+navigation. `config` and `config_extend` cannot be combined.
+
+```javascript
+export default (config) => ({
+  ...config,
+  themeConfig: {...config.themeConfig, search: {provider: 'local'}},
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`
@@ -179,6 +211,17 @@ runs the foreground server. For generated configuration, C<base> sets
 VitePress's deployment base path. An authored configuration remains
 authoritative.
 
+Set C<config_extend> to an ECMAScript module whose default export is a function
+accepting C<(config, context)>. It may return the generated configuration after
+adding VitePress settings; synchronous and asynchronous functions are accepted.
+The context contains the generated publication name, base, output, pages, and
+navigation. C<config> and C<config_extend> cannot be combined.
+
+
+ export default (config) => ({
+   ...config,
+   themeConfig: {...config.themeConfig, search: {provider: 'local'}},
+ });
 
 =head1 SEE ALSO
 

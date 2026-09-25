@@ -16,6 +16,16 @@ eval {
 };
 
 
+#  Optional publication helpers provide the build, preview, and publication
+#  targets when the companion adapter is installed.
+#
+eval {
+    require ASPEER::MakeMaker::Markdown::Publish;
+    ASPEER::MakeMaker::Markdown::Publish->import();
+    1;
+};
+
+
 #  Main Makefile.PL section
 #
 my $mm_ver=$ExtUtils::MakeMaker::VERSION;
@@ -59,8 +69,16 @@ my %WriteMakefile=(
         prereqs     => {
             configure => {
                 suggests => {
-                    'ASPEER::MakeMaker::Markdown::Pod' => '0.012',
+                    'ASPEER::MakeMaker::Markdown::Pod'     => '0.012',
+                    'ASPEER::MakeMaker::Markdown::Publish' => '0.001',
                 },
+            },
+        },
+        x_documentation => {
+            publish => {
+                module  => 'mkdocs',
+                name    => 'ASPEER::Markdown::Publish',
+                sources => ['doc'],
             },
         },
         resources   => {

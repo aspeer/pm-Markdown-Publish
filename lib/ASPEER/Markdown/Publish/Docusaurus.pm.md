@@ -20,6 +20,18 @@ and configuration path; `build` returns the site directory; `serve` runs the
 foreground server. For generated configuration, `base` sets Docusaurus's
 `baseUrl`. An authored configuration remains authoritative.
 
+Set `config_extend` to a CommonJS module exporting a synchronous function that
+accepts `(config, context)` and returns the Docusaurus configuration to use.
+The context contains the generated publication name, base, output, pages, and
+navigation. `config` and `config_extend` cannot be combined.
+
+```javascript
+module.exports = (config) => ({
+  ...config,
+  onBrokenLinks: 'throw',
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`

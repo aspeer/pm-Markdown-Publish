@@ -66,7 +66,7 @@ sub prepare {
     };
     $self->write_file(File::Spec->catfile($site_dn, 'package.json'), encode_json($package_hr));
     $self->write_file(File::Spec->catfile($site_dn, 'local-links.mjs'), $self->local_links_plugin());
-    my $config_fn=$self->option('config', undef);
+    my ($config_fn, $extend_fn)=$self->configuration_files();
     my $prepared_config_fn;
     if (defined($config_fn) && length($config_fn)) {
         die "Starlight configuration not found: $config_fn\n" unless -f $config_fn;
@@ -93,17 +93,38 @@ sub prepare {
             "      { label: ".encode_json($_->{'title'}).
                 ", slug: ".encode_json($slug)." }"
         } @{$navigation_ar};
-        my $config="import { defineConfig } from 'astro/config';\n".
+        my $imports="import { defineConfig } from 'astro/config';\n".
             "import { unified } from '\@astrojs/markdown-remark';\n".
             "import starlight from '\@astrojs/starlight';\n\n".
-            "import localLinks from './local-links.mjs';\n\n".
-            "export default defineConfig({\n".
-            "  base: ".encode_json($self->site_base('/')).",\n".
-            "  markdown: { processor: unified({ remarkPlugins: [localLinks] }) },\n".
-            "  integrations: [starlight({\n    title: ".
+            "import localLinks from './local-links.mjs';\n";
+        my $astro="{\n  base: ".encode_json($self->site_base('/')).",\n".
+            "  markdown: { processor: unified({ remarkPlugins: [localLinks] }) }\n}";
+        my $starlight="{\n    title: ".
             encode_json($self->option('name', 'Documentation')).
             ",\n    sidebar: [{ label: 'Docs', items: [\n".
-            join(",\n", @items)."\n    ] }]\n  })]\n});\n";
+            join(",\n", @items)."\n    ] }]\n  }";
+        my $config;
+        if (defined($extend_fn)) {
+            die "Starlight configuration extension not found: $extend_fn\n"
+                unless -f $extend_fn;
+            my $context_hr=$self->configuration_context($pages_ar, $navigation_ar);
+            my $authored_fn=abs_path($extend_fn);
+            $config=$imports."import { pathToFileURL } from 'node:url';\n\n".
+                "const generated = { astro: $astro, starlight: $starlight };\n".
+                "const context = ".encode_json($context_hr).";\n".
+                "const extend = (await import(pathToFileURL(".
+                encode_json($authored_fn).").href)).default;\n".
+                "if (typeof extend !== 'function') throw new Error('Starlight config_extend must export a default function');\n".
+                "const configured = await extend(generated, context);\n".
+                "if (!configured || typeof configured !== 'object' || !configured.astro || !configured.starlight) throw new Error('Starlight config_extend must return astro and starlight configuration objects');\n".
+                "const integrations = configured.astro.integrations || [];\n".
+                "if (!Array.isArray(integrations)) throw new Error('Starlight config_extend astro.integrations must be an array');\n".
+                "const { integrations: unused, ...astro } = configured.astro;\n".
+                "export default defineConfig({ ...astro, integrations: [starlight(configured.starlight), ...integrations] });\n";
+        }
+        else {
+            $config=$imports."\nexport default defineConfig({ ...$astro, integrations: [starlight($starlight)] });\n";
+        }
         $prepared_config_fn=File::Spec->catfile($site_dn, 'astro.config.mjs');
         $self->write_file($prepared_config_fn, $config);
     }
@@ -296,6 +317,24 @@ corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must
 be unified if it sets one explicitly.
 
+Set `config_extend` to an ECMAScript module whose default export receives
+`({astro, starlight}, context)`. It must return both objects. `astro` contains
+the generated Astro settings and required Markdown processor; `starlight`
+contains the generated title and sidebar options passed to the Starlight
+integration. Extra `astro.integrations` are retained after the Starlight
+integration. Synchronous and asynchronous functions are accepted. `config`
+and `config_extend` cannot be combined.
+
+```javascript
+export default ({astro, starlight}) => ({
+  astro,
+  starlight: {
+    ...starlight,
+    social: [{icon: 'github', label: 'GitHub', href: 'https://github.com/example/project'}],
+  },
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`
@@ -329,6 +368,22 @@ corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must
 be unified if it sets one explicitly.
 
+Set C<config_extend> to an ECMAScript module whose default export receives
+C<({astro, starlight}, context)>. It must return both objects. C<astro> contains
+the generated Astro settings and required Markdown processor; C<starlight>
+contains the generated title and sidebar options passed to the Starlight
+integration. Extra C<astro.integrations> are retained after the Starlight
+integration. Synchronous and asynchronous functions are accepted. C<config>
+and C<config_extend> cannot be combined.
+
+
+ export default ({astro, starlight}) => ({
+   astro,
+   starlight: {
+     ...starlight,
+     social: [{icon: 'github', label: 'GitHub', href: 'https://github.com/example/project'}],
+   },
+ });
 
 =head1 SEE ALSO
 

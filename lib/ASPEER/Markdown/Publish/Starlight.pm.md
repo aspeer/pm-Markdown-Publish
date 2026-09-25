@@ -24,6 +24,24 @@ corresponding Starlight page in the temporary project. An authored Astro
 configuration is wrapped to retain this behavior; its Markdown processor must
 be unified if it sets one explicitly.
 
+Set `config_extend` to an ECMAScript module whose default export receives
+`({astro, starlight}, context)`. It must return both objects. `astro` contains
+the generated Astro settings and required Markdown processor; `starlight`
+contains the generated title and sidebar options passed to the Starlight
+integration. Extra `astro.integrations` are retained after the Starlight
+integration. Synchronous and asynchronous functions are accepted. `config`
+and `config_extend` cannot be combined.
+
+```javascript
+export default ({astro, starlight}) => ({
+  astro,
+  starlight: {
+    ...starlight,
+    social: [{icon: 'github', label: 'GitHub', href: 'https://github.com/example/project'}],
+  },
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`

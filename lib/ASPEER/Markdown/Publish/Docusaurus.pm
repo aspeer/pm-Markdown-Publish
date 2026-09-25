@@ -69,20 +69,39 @@ sub prepare {
         }
     };
     $self->write_file(File::Spec->catfile($site_dn, 'package.json'), encode_json($package_hr));
-    my $config_fn=$self->option('config', undef);
+    my ($config_fn, $extend_fn)=$self->configuration_files();
     my $prepared_config_fn;
     if (defined($config_fn) && length($config_fn)) {
         die "Docusaurus configuration not found: $config_fn\n" unless -f $config_fn;
         $prepared_config_fn=abs_path($config_fn);
     }
     else {
-        my $config="module.exports = {\n  title: ".
+        my $generated="{\n  title: ".
             encode_json($self->option('name', 'Documentation')).
             ",\n  url: 'http://localhost',\n  baseUrl: ".
             encode_json($self->site_base('/')).
             ",\n  onBrokenLinks: 'warn',\n".
             "  markdown: { format: 'detect' },\n".
-            "  presets: [['classic', { docs: { routeBasePath: '/', sidebarPath: require.resolve('./sidebars.js') }, blog: false }]],\n};\n";
+            "  presets: [['classic', { docs: { routeBasePath: '/', sidebarPath: require.resolve('./sidebars.js') }, blog: false }]],\n}";
+        my $config;
+        if (defined($extend_fn)) {
+            die "Docusaurus configuration extension not found: $extend_fn\n"
+                unless -f $extend_fn;
+            my $context_hr=$self->configuration_context($pages_ar, $navigation_ar);
+            my $authored_fn=abs_path($extend_fn);
+            $config="const generated = $generated;\n".
+                "const context = ".encode_json($context_hr).";\n".
+                "const loaded = require(".encode_json($authored_fn).");\n".
+                "const extend = loaded.default || loaded;\n".
+                "if (typeof extend !== 'function') throw new Error('Docusaurus config_extend must export a function');\n".
+                "const configured = extend(generated, context);\n".
+                "if (configured && typeof configured.then === 'function') throw new Error('Docusaurus config_extend must be synchronous');\n".
+                "if (!configured || typeof configured !== 'object' || Array.isArray(configured)) throw new Error('Docusaurus config_extend must return a configuration object');\n".
+                "module.exports = configured;\n";
+        }
+        else {
+            $config="module.exports = $generated;\n";
+        }
         $prepared_config_fn=File::Spec->catfile($site_dn, 'docusaurus.config.js');
         $self->write_file($prepared_config_fn, $config);
     }
@@ -171,6 +190,18 @@ and configuration path; `build` returns the site directory; `serve` runs the
 foreground server. For generated configuration, `base` sets Docusaurus's
 `baseUrl`. An authored configuration remains authoritative.
 
+Set `config_extend` to a CommonJS module exporting a synchronous function that
+accepts `(config, context)` and returns the Docusaurus configuration to use.
+The context contains the generated publication name, base, output, pages, and
+navigation. `config` and `config_extend` cannot be combined.
+
+```javascript
+module.exports = (config) => ({
+  ...config,
+  onBrokenLinks: 'throw',
+});
+```
+
 # SEE ALSO
 
 `ASPEER::Markdown::Publish`
@@ -200,6 +231,16 @@ and configuration path; C<build> returns the site directory; C<serve> runs the
 foreground server. For generated configuration, C<base> sets Docusaurus's
 C<baseUrl>. An authored configuration remains authoritative.
 
+Set C<config_extend> to a CommonJS module exporting a synchronous function that
+accepts C<(config, context)> and returns the Docusaurus configuration to use.
+The context contains the generated publication name, base, output, pages, and
+navigation. C<config> and C<config_extend> cannot be combined.
+
+
+ module.exports = (config) => ({
+   ...config,
+   onBrokenLinks: 'throw',
+ });
 
 =head1 SEE ALSO
 

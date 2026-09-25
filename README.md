@@ -13,6 +13,8 @@ markdown-publish build
 markdown-publish serve
 # Update the local publication branch:
 markdown-publish gh
+# Update it and push that branch to origin:
+markdown-publish gh-push
 # Explicit Cloudflare Workers Static Assets deployment:
 markdown-publish cloudflare --config doc/project.json
 ```
@@ -44,6 +46,11 @@ directory, publication branch, deployment base, and executable names. For
 generated VitePress, Docusaurus, and Starlight configuration, `base` maps to
 the engine's deployment base path; an authored engine configuration remains
 authoritative.
+Set `config_extend` to customise generated defaults without replacing them.
+MkDocs inherits the supplied YAML; the Node publishers call an extension
+function with their generated configuration and publication context. It cannot
+be combined with the authoritative `config` setting. See the engine module
+documentation for its extension-module shape.
 For npm-based engines, installation start and completion are always reported.
 Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
 To listen on another interface and port with any publisher, run
@@ -56,7 +63,8 @@ temporary worktree without contacting a remote. Push that branch through the
 repository's normal Git workflow when it is ready. If `base` is not configured,
 `gh` derives `/<repository>/` from `origin`, or `/` for an
 `<owner>.github.io` repository. Set `base` explicitly when the published URL
-uses a different path.
+uses a different path. `gh-push` performs the same local publication and then
+pushes only the publication branch to `origin` without forcing it.
 
 For Workers Static Assets, set `cloudflare.config` in `doc/project.json` to a
 dedicated Wrangler configuration file. The `cloudflare` action builds the

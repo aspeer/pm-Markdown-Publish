@@ -2,6 +2,8 @@ bin/markdown-publish
 bin/markdown-publish.md
 Changes
 cpanfile
+doc/markdown-publish.md
+doc/markdown-publish.xml
 examples/configured/content/index.md
 examples/configured/mkdocs.yml
 examples/configured/README.md

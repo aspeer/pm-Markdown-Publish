@@ -8,13 +8,15 @@ markdown-publish - build, preview, and publish Perl distribution documentation
 markdown-publish build
 markdown-publish serve --config doc/project.json
 markdown-publish gh --config doc/project.json
+markdown-publish gh-push --config doc/project.json
 markdown-publish cloudflare --config doc/project.json
 ```
 
 `build` prepares and renders the site. `serve` starts the selected engine's
 foreground local server. `gh` builds, updates the configured publication
 branch, and leaves it local. Push that branch through the repository's normal
-Git workflow.
+Git workflow. `gh-push` performs the same operation and then pushes the
+publication branch to `origin`.
 
 `cloudflare` builds the selected engine and deploys its output to a Cloudflare
 Worker using the `cloudflare.config` Wrangler file in the JSON configuration.
@@ -27,8 +29,8 @@ selected with `mkdocs`, `vitepress`, `docusaurus`, or `starlight`; a fully
 qualified name may select another installed subclass. Without `--config`, an
 existing `doc/project.json` is read automatically. Other options are repeatable
 `--source DIRECTORY`, `--name`, `--base`, `--output`, and `--branch`. The base
-must begin and end with `/`. For `gh`, it defaults to the path implied by the
-`origin` repository name: `/<repository>/`, or `/` for an `<owner>.github.io`
-repository.
+must begin and end with `/`. For `gh` and `gh-push`, it defaults to the path
+implied by the `origin` repository name: `/<repository>/`, or `/` for an
+`<owner>.github.io` repository.
 
 `--version` prints the installed program version.

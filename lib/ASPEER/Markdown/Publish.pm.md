@@ -16,6 +16,7 @@ my $publish_or=ASPEER::Markdown::Publish->new({
 $publish_or->run('build');
 $publish_or->run('serve');
 $publish_or->run('gh');
+$publish_or->run('gh-push');
 $publish_or->run('cloudflare');
 ```
 
@@ -71,6 +72,19 @@ Starlight configuration. It must begin and end with `/`; for example,
 `base => '/example/'`. An authored engine configuration remains authoritative
 for its own base path.
 
+Set `config_extend` instead of `config` to customise a generated configuration.
+The two settings cannot be combined. MkDocs inherits the supplied YAML file.
+VitePress and Starlight load an ECMAScript module whose default export is a
+function; Docusaurus loads a CommonJS module exporting a synchronous function.
+Each function receives the generated configuration followed by a context object
+containing `name`, `base`, `output`, `pages`, and `navigation`, and must return
+the configuration to use.
+
+VitePress and Docusaurus receive their native configuration object. Starlight
+receives `{astro, starlight}` so its Astro settings and the options passed to
+the Starlight integration can be extended separately. Generated values remain
+in effect unless the function explicitly replaces them.
+
 For a static documentation Worker, a minimal authored `wrangler.jsonc` is:
 
 ```jsonc
@@ -105,10 +119,12 @@ Reads a JSON configuration and constructs its selected engine.
 
 ## run
 
-Dispatches `build`, `serve`, `gh`, or `cloudflare`. `gh` builds the
+Dispatches `build`, `serve`, `gh`, `gh-push`, or `cloudflare`. `gh` builds the
 site and updates the local publication branch. It does not contact a remote;
-push the branch through the repository's normal Git workflow. It is an
-explicit publishing action, not part of `build` or `serve`. `cloudflare`
+push the branch through the repository's normal Git workflow. `gh-push`
+performs the same build and local branch update, then pushes that branch to
+`origin`. These are explicit publishing actions, not part of `build` or
+`serve`. `cloudflare`
 builds and deploys the static files to a Cloudflare Worker without committing
 or pushing Git.
 
@@ -136,6 +152,11 @@ project repository uses `/<repository>/`, while a repository named
 directory name is used. This inferred value applies only to the GitHub Pages
 build; ordinary builds, local preview, and Cloudflare publication keep their
 normal base path.
+
+## publish_gh_push
+
+Runs `publish_gh`, then pushes the resulting publication branch to `origin`.
+It does not force the update or push any other branch.
 
 ## publish_cloudflare
 

@@ -60,6 +60,17 @@ blurp('bin/nested/example.md', "# example\n\nUtility documentation.\n");
 #  doc is the default publication boundary when present
 #
 my $publish_or=ASPEER::Markdown::Publish::MkDocs->new();
+is($publish_or->markdown_title('Cloudflare/API.pm.md',
+    "# Cloudflare::API #\n\n# NAME #\n"), 'Cloudflare::API',
+    'closing ATX hash is omitted from the page title');
+is($publish_or->markdown_title('guide.md',
+    "# Guide ### {#guide}\n"), 'Guide',
+    'closing ATX hashes and heading attributes are omitted from the page title');
+is($publish_or->markdown_title('language.md', "# C#\n"), 'C#',
+    'literal hash without separating whitespace remains in the page title');
+is($publish_or->markdown_title('release.md',
+    "---\ntitle: \"Release #\"\n---\n\n# Ignored #\n"), 'Release #',
+    'authored frontmatter title retains its literal hash');
 my ($assembly_dn, $docs_dn, $pages_ar)=$publish_or->prepare_docs();
 ok(-f "$docs_dn/guide--start.md", 'doc guide is split into publication pages');
 ok(!-e "$docs_dn/modules/Sample_Module.md", 'module sidecar is excluded by default');
@@ -142,8 +153,17 @@ my $mkdocs_fn=$publish_or->prepare(1);
 like(slurp($mkdocs_fn), qr/^INHERIT: .*custom\.yml/m,
     'custom MkDocs configuration is inherited');
 like(slurp($mkdocs_fn), qr/^docs_dir: /m, 'assembled documentation overrides docs_dir');
+blurp('doc/mkdocs/extend.yml', "site_name: Extended\n");
+my $extended_mkdocs_or=ASPEER::Markdown::Publish::MkDocs->new({
+    sources => ['doc'], config_extend => 'doc/mkdocs/extend.yml'
+});
+my $extended_mkdocs_fn=$extended_mkdocs_or->prepare(0);
+like(slurp($extended_mkdocs_fn), qr/^INHERIT: .*extend\.yml/m,
+    'MkDocs configuration extension is inherited');
 
 blurp('config/vitepress.mts', "export default { title: 'Custom' };\n");
+blurp('config/vitepress.extend.mjs',
+    "export default (config, context) => ({ ...config, description: context.name });\n");
 blurp('doc/chapters.md',
     "# First Chapter {#first}\n\nFirst.\n\n[Module](lib/Sample/Module.pm.md#details)\n\n[Reference][ref]\n\n[ref]: reference/child.md#detail\n\n# Second Chapter {#second}\n\nSecond.\n");
 blurp('doc/formatting.md', <<'MARKDOWN');
@@ -203,8 +223,22 @@ $publish_or=ASPEER::Markdown::Publish::VitePress->new({
 my (undef, $vitepress_dn, $vitepress_config_fn)=$publish_or->prepare();
 is($vitepress_config_fn, abs_path('config/vitepress.mts'),
     'custom VitePress configuration location retained');
+$publish_or=ASPEER::Markdown::Publish::VitePress->new({
+    sources => ['doc'], name => 'Extended VitePress', base => '/sample-docs/',
+    config_extend => 'config/vitepress.extend.mjs'
+});
+(undef, undef, my $extended_vitepress_fn)=$publish_or->prepare();
+my $extended_vitepress=slurp($extended_vitepress_fn);
+like($extended_vitepress, qr/const generated = \{.*themeConfig:/s,
+    'VitePress extension receives generated defaults');
+like($extended_vitepress, qr/const context = .*"base":"\/sample-docs\/"/,
+    'VitePress extension receives publication context');
+like($extended_vitepress, qr/vitepress\.extend\.mjs/,
+    'VitePress extension is imported from its authored location');
 
 blurp('config/docusaurus.js', "module.exports = { title: 'Custom' };\n");
+blurp('config/docusaurus.extend.cjs',
+    "module.exports = (config, context) => ({ ...config, tagline: context.name });\n");
 blurp('doc/guide.md', "# Guide {#guide}\n\nText.\n");
 $publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
     sources => ['doc'], base => '/sample-docs/'
@@ -248,8 +282,22 @@ is($docusaurus_config_fn, abs_path('config/docusaurus.js'),
     'custom Docusaurus configuration location retained');
 like(slurp("$docusaurus_dn/docs/guide.md"), qr/<a id="guide"><\/a>/,
     'Docusaurus receives explicit HTML heading anchors');
+$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
+    sources => ['doc'], name => 'Extended Docusaurus', base => '/sample-docs/',
+    config_extend => 'config/docusaurus.extend.cjs'
+});
+(undef, undef, my $extended_docusaurus_fn)=$publish_or->prepare();
+my $extended_docusaurus=slurp($extended_docusaurus_fn);
+like($extended_docusaurus, qr/const generated = \{.*presets:/s,
+    'Docusaurus extension receives generated defaults');
+like($extended_docusaurus, qr/const context = .*"name":"Extended Docusaurus"/,
+    'Docusaurus extension receives publication context');
+like($extended_docusaurus, qr/docusaurus\.extend\.cjs/,
+    'Docusaurus extension is loaded from its authored location');
 
 blurp('config/astro.mjs', "export default {};\n");
+blurp('config/starlight.extend.mjs',
+    "export default ({ astro, starlight }) => ({ astro, starlight: { ...starlight, description: 'Extended' } });\n");
 blurp('doc/ModuleName.md', "# Mixed Case Module\n\nText.\n");
 $publish_or=ASPEER::Markdown::Publish::Starlight->new({
     sources => ['doc'], base => '/sample-docs/'
@@ -300,6 +348,38 @@ like(slurp($starlight_config_fn), qr/mergeConfig\(authored, \{ markdown: \{ proc
 my $authored_starlight_config_fn=abs_path('config/astro.mjs');
 like(slurp($starlight_config_fn), qr/\Q$authored_starlight_config_fn\E/,
     'temporary configuration imports the authored configuration');
+$publish_or=ASPEER::Markdown::Publish::Starlight->new({
+    sources => ['doc'], name => 'Extended Starlight', base => '/sample-docs/',
+    config_extend => 'config/starlight.extend.mjs'
+});
+(undef, undef, my $extended_starlight_fn)=$publish_or->prepare();
+my $extended_starlight=slurp($extended_starlight_fn);
+like($extended_starlight, qr/const generated = \{ astro: \{.*starlight: \{/s,
+    'Starlight extension receives generated Astro and Starlight defaults');
+like($extended_starlight, qr/const context = .*"name":"Extended Starlight"/,
+    'Starlight extension receives publication context');
+like($extended_starlight, qr/starlight\.extend\.mjs/,
+    'Starlight extension is imported from its authored location');
+
+eval {ASPEER::Markdown::Publish::VitePress->new({
+    sources => ['doc'], config => 'config/vitepress.mts',
+    config_extend => 'config/vitepress.extend.mjs'
+})->prepare()};
+like($@, qr/config and config_extend cannot be combined/,
+    'authoritative and extending configuration cannot be combined');
+
+eval {ASPEER::Markdown::Publish::VitePress->new({
+    sources => ['doc'], config_extend => 'config/missing.extend.mjs'
+})->prepare()};
+like($@, qr/VitePress configuration extension not found/,
+    'missing configuration extension is reported');
+
+eval {ASPEER::Markdown::Publish::MkDocs->new({
+    sources => ['doc'], config_extend => 'doc/mkdocs/extend.yml',
+    config_mode => 'direct'
+})->prepare()};
+like($@, qr/config_extend cannot be used with direct MkDocs configuration/,
+    'MkDocs extension cannot bypass generated publication settings');
 
 eval {ASPEER::Markdown::Publish::VitePress->new({
     sources => ['doc'], base => 'sample-docs'
@@ -340,7 +420,8 @@ SKIP: {
     skip 'set STARLIGHT_TEST=1 to run a real Astro build', 4
         unless $ENV{'STARLIGHT_TEST'};
     my $real_or=ASPEER::Markdown::Publish::Starlight->new({
-        sources => ['doc'], output => "$temporary_dn/starlight-site"
+        sources => ['doc'], output => "$temporary_dn/starlight-site",
+        config_extend => 'config/starlight.extend.mjs'
     });
     my $real_site_dn=$real_or->build();
     my $chapter_html=slurp("$real_site_dn/chapters--first/index.html");
@@ -644,6 +725,7 @@ is_deeply($npm_or->{'install_command'},
     sub build {my ($self)=@_; $self->{'called'}='build'; return 1}
     sub serve {my ($self)=@_; $self->{'called'}='serve'; return 1}
     sub publish_gh {my ($self)=@_; $self->{'called'}='gh'; return 1}
+    sub publish_gh_push {my ($self)=@_; $self->{'called'}='gh-push'; return 1}
 }
 my $test_or=TestPublish->new();
 $test_or->run('build');
@@ -652,8 +734,34 @@ $test_or->run('serve');
 is($test_or->{'called'}, 'serve', 'serve action dispatches');
 $test_or->run('gh');
 is($test_or->{'called'}, 'gh', 'gh action dispatches');
+$test_or->run('gh-push');
+is($test_or->{'called'}, 'gh-push', 'gh-push action dispatches');
 eval {$test_or->run('unknown')};
 like($@, qr/unknown publication action/, 'unknown action rejected');
+
+{
+    package TestGitHubPush;
+    use vars qw(@ISA);
+    @ISA=qw(ASPEER::Markdown::Publish::MkDocs);
+    sub publish_gh {
+        my ($self)=@_;
+        $self->{'published'}++;
+        return $self->{'branch'};
+    }
+    sub command {
+        my ($self, @command)=@_;
+        $self->{'push_command'}=\@command;
+        return '';
+    }
+}
+my $push_or=TestGitHubPush->new({branch => 'project-pages'});
+is($push_or->publish_gh_push(), 'project-pages',
+    'GitHub push returns the published branch');
+is($push_or->{'published'}, 1,
+    'GitHub push first updates the local publication branch');
+is_deeply($push_or->{'push_command'},
+    ['git', 'push', 'origin', 'project-pages'],
+    'GitHub push sends only the publication branch to origin');
 
 
 #  Cloudflare deployment uses the built site and an authored Worker config

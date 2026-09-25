@@ -20,6 +20,10 @@ owns that layout. `command`, `strict`, `address`, and `output` customise the
 build and local server. `prepare($preview)` returns the configuration path;
 `build` returns the site directory; `serve` runs the foreground server.
 
+`config_extend` explicitly selects a supplemental YAML file for inheritance.
+It cannot be combined with `config` or direct mode. The publisher retains
+control of the assembled `docs_dir`, `site_dir`, and generated navigation.
+
 When no home page is authored, the first top-level assembled page is also used
 for `index.md`. Its original URL remains available for existing links.
 
