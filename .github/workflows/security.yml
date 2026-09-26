@@ -24,7 +24,7 @@ jobs:
           perl-version: '5.44.0'
       - name: Install dependencies for audit
         run: |
-          cpanm --notest --local-lib-contained audit CPAN::Audit
           cpanm --notest --local-lib-contained audit --installdeps .
+          cpanm --notest --local-lib-contained audit CPAN::Audit
       - name: Audit installed dependencies
         run: perl -Iaudit/lib/perl5 audit/bin/cpan-audit installed audit --no-corelist
