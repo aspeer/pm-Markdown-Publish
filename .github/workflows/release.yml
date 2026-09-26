@@ -72,7 +72,7 @@ jobs:
           subject-path: ${{ steps.sign-dist.outputs.dist_file }}
 
       - name: Upload distribution artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: markdown-publish-dist
           path: |
