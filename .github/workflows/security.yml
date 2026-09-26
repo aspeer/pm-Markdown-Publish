@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
       - name: Set up Perl
-        uses: shogo82148/actions-setup-perl@v1.42.0
+        uses: shogo82148/actions-setup-perl@v1.44.0
         with:
           perl-version: '5.44.0'
       - name: Install dependencies for audit
