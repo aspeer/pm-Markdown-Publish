@@ -27,4 +27,4 @@ jobs:
           cpanm --notest --local-lib-contained audit CPAN::Audit
           cpanm --notest --local-lib-contained audit --installdeps .
       - name: Audit installed dependencies
-        run: audit/bin/cpan-audit installed audit
+        run: perl -Iaudit/lib/perl5 audit/bin/cpan-audit installed audit --no-corelist
