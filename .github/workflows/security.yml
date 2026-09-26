@@ -27,4 +27,4 @@ jobs:
           cpanm --notest --local-lib-contained audit --installdeps .
           cpanm --notest --local-lib-contained audit CPAN::Audit Module::Extract::VERSION
       - name: Audit installed dependencies
-        run: perl -Iaudit/lib/perl5 audit/bin/cpan-audit installed audit --no-corelist
+        run: perl -I"$GITHUB_WORKSPACE/audit/lib/perl5" audit/bin/cpan-audit installed audit --no-corelist
