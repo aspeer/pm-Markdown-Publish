@@ -22,7 +22,9 @@ jobs:
         uses: shogo82148/actions-setup-perl@v1.42.0
         with:
           perl-version: '5.44.0'
-      - name: Install CPAN Audit
-        run: cpanm --notest CPAN::Audit
-      - name: Audit declared dependencies
-        run: cpan-audit deps .
+      - name: Install dependencies for audit
+        run: |
+          cpanm --notest --local-lib-contained audit CPAN::Audit
+          cpanm --notest --local-lib-contained audit --installdeps .
+      - name: Audit installed dependencies
+        run: audit/bin/cpan-audit installed audit
