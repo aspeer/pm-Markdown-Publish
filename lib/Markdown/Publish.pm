@@ -1,5 +1,5 @@
 #
-#  This file is part of ASPEER::Markdown::Publish.
+#  This file is part of Markdown::Publish.
 #
 #  This software is copyright (c) 2026 by Andrew Speer <andrew.speer@isolutions.com.au>.
 #
@@ -10,7 +10,7 @@
 #
 #  <http://dev.perl.org/licenses/>
 #
-package ASPEER::Markdown::Publish;
+package Markdown::Publish;
 
 
 #  Compiler pragma and package variables
@@ -31,13 +31,13 @@ use File::Spec;
 use File::Temp qw(tempdir);
 use IPC::Run3 qw(run3);
 use JSON::PP qw(decode_json encode_json);
-use ASPEER::Markdown::Publish::Constant;
+use Markdown::Publish::Constant;
 
 
 #  Version information
 #
 $AUTHORITY='cpan:ASPEER';
-$VERSION='0.001';
+$VERSION='1.001';
 
 
 #  Supported publication actions
@@ -48,10 +48,10 @@ my %ACTION=map {$_ => 1} qw(build serve gh gh-push cloudflare);
 #  Short names for the publisher classes supplied by this distribution
 #
 my %module_alias=(
-    mkdocs     => 'ASPEER::Markdown::Publish::MkDocs',
-    vitepress  => 'ASPEER::Markdown::Publish::VitePress',
-    docusaurus => 'ASPEER::Markdown::Publish::Docusaurus',
-    starlight  => 'ASPEER::Markdown::Publish::Starlight'
+    mkdocs     => 'Markdown::Publish::MkDocs',
+    vitepress  => 'Markdown::Publish::VitePress',
+    docusaurus => 'Markdown::Publish::Docusaurus',
+    starlight  => 'Markdown::Publish::Starlight'
 );
 
 
@@ -87,7 +87,7 @@ sub new {
         };
         die "unable to load publication module $publisher: $@"
             unless $loaded;
-        die "$publisher is not an ASPEER::Markdown::Publish subclass\n"
+        die "$publisher is not a Markdown::Publish subclass\n"
             unless $publisher->isa(__PACKAGE__);
         return $publisher->new($opt_hr);
     }
@@ -926,15 +926,15 @@ __END__
 
 # NAME
 
-ASPEER::Markdown::Publish - common documentation publication operations
+Markdown::Publish - common documentation publication operations
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish;
+use Markdown::Publish;
 
-my $publish_or=ASPEER::Markdown::Publish->new({
-    module  => 'ASPEER::Markdown::Publish::MkDocs',
+my $publish_or=Markdown::Publish->new({
+    module  => 'Markdown::Publish::MkDocs',
     sources => ['doc'],
     config  => 'doc/mkdocs/mkdocs.yml',
 });
@@ -968,7 +968,7 @@ page becomes the home page in each engine; its original URL remains available.
 
 # CONFIGURATION
 
-The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
+The default engine is `Markdown::Publish::MkDocs`. Select another class
 with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
 when it comes from a JSON file or MakeMaker metadata. The `mkdocs`, `vitepress`,
 `docusaurus`, and `starlight` shortcuts select the bundled publishers. A fully
@@ -977,7 +977,7 @@ flat, rather than nested beneath engine names:
 
 ```perl
 {
-    module  => 'ASPEER::Markdown::Publish::Docusaurus',
+    module  => 'Markdown::Publish::Docusaurus',
     sources => ['doc'],
     name    => 'Example documentation',
     config  => 'doc/docusaurus/docusaurus.config.js',
@@ -1102,10 +1102,10 @@ update its settings; review its config before invoking this remote action.
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish::MkDocs`,
-`ASPEER::Markdown::Publish::VitePress`,
-`ASPEER::Markdown::Publish::Docusaurus`,
-`ASPEER::Markdown::Publish::Starlight`,
+`Markdown::Publish::MkDocs`,
+`Markdown::Publish::VitePress`,
+`Markdown::Publish::Docusaurus`,
+`Markdown::Publish::Starlight`,
 `ASPEER::MakeMaker::Markdown::Publish`
 
 # AUTHOR
@@ -1114,7 +1114,7 @@ Andrew Speer <andrew.speer@isolutions.com.au>
 
 # LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+This file is part of Markdown::Publish. Copyright (c) 2026 Andrew
 Speer. This is free software; you can redistribute it and/or modify it under
 the same terms as Perl 5.
 
@@ -1123,16 +1123,16 @@ the same terms as Perl 5.
 
 =head1 NAME
 
-ASPEER::Markdown::Publish - common documentation publication operations
+Markdown::Publish - common documentation publication operations
 
 
 =head1 SYNOPSIS
 
 
- use ASPEER::Markdown::Publish;
+ use Markdown::Publish;
 
- my $publish_or=ASPEER::Markdown::Publish->new({
-     module  => 'ASPEER::Markdown::Publish::MkDocs',
+ my $publish_or=Markdown::Publish->new({
+     module  => 'Markdown::Publish::MkDocs',
      sources => ['doc'],
      config  => 'doc/mkdocs/mkdocs.yml',
  });
@@ -1166,7 +1166,7 @@ page becomes the home page in each engine; its original URL remains available.
 
 =head1 CONFIGURATION
 
-The default engine is C<ASPEER::Markdown::Publish::MkDocs>. Select another class
+The default engine is C<Markdown::Publish::MkDocs>. Select another class
 with C<module>. C<MARKDOWN_PUBLISH_MODULE> overrides C<module>, including
 when it comes from a JSON file or MakeMaker metadata. The C<mkdocs>, C<vitepress>,
 C<docusaurus>, and C<starlight> shortcuts select the bundled publishers. A fully
@@ -1175,7 +1175,7 @@ flat, rather than nested beneath engine names:
 
 
  {
-     module  => 'ASPEER::Markdown::Publish::Docusaurus',
+     module  => 'Markdown::Publish::Docusaurus',
      sources => ['doc'],
      name    => 'Example documentation',
      config  => 'doc/docusaurus/docusaurus.config.js',
@@ -1307,10 +1307,10 @@ update its settings; review its config before invoking this remote action.
 
 =head1 SEE ALSO
 
-C<ASPEER::Markdown::Publish::MkDocs>,
-C<ASPEER::Markdown::Publish::VitePress>,
-C<ASPEER::Markdown::Publish::Docusaurus>,
-C<ASPEER::Markdown::Publish::Starlight>,
+C<Markdown::Publish::MkDocs>,
+C<Markdown::Publish::VitePress>,
+C<Markdown::Publish::Docusaurus>,
+C<Markdown::Publish::Starlight>,
 C<ASPEER::MakeMaker::Markdown::Publish>
 
 
@@ -1321,7 +1321,7 @@ Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
 
 =head1 LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+This file is part of Markdown::Publish. Copyright (c) 2026 Andrew
 Speer. This is free software; you can redistribute it and/or modify it under
 the same terms as Perl 5.
 

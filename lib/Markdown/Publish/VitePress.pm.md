@@ -1,12 +1,12 @@
 # NAME
 
-ASPEER::Markdown::Publish::VitePress - publish distribution documentation with VitePress
+Markdown::Publish::VitePress - publish distribution documentation with VitePress
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish::VitePress;
-my $publish_or=ASPEER::Markdown::Publish::VitePress->new({sources => ['doc']});
+use Markdown::Publish::VitePress;
+my $publish_or=Markdown::Publish::VitePress->new({sources => ['doc']});
 $publish_or->build();
 ```
 
@@ -37,4 +37,13 @@ export default (config) => ({
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish`
+`Markdown::Publish`
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.

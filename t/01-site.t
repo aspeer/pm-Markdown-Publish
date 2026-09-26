@@ -4,9 +4,9 @@ use Test::More;
 use File::Temp qw(tempdir);
 use File::Path qw(make_path);
 use Cwd qw(getcwd);
-use ASPEER::Markdown::Publish::MkDocs;
+use Markdown::Publish::MkDocs;
 
-my $site_or=ASPEER::Markdown::Publish::MkDocs->new();
+my $site_or=Markdown::Publish::MkDocs->new();
 my $pages_hr=$site_or->split('guide.md', "# Z {#z}\n\n[Next](#a)\n\n~~~~\n# not a heading\n[Next](#a)\n~~~~\n\n# A {#a}\n\nEnd.\n");
 is(scalar(keys %{$pages_hr}), 2, 'headings in fences do not split chapters');
 is_deeply($site_or->{'page_order'}, ['guide--z.md', 'guide--a.md'], 'chapter order preserved');

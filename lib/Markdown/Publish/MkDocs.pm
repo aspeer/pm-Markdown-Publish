@@ -1,5 +1,5 @@
 #
-#  This file is part of ASPEER::Markdown::Publish.
+#  This file is part of Markdown::Publish.
 #
 #  This software is copyright (c) 2026 by Andrew Speer
 #  <andrew.speer@isolutions.com.au>.
@@ -7,7 +7,7 @@
 #  This is free software; you can redistribute it and/or modify it under
 #  the same terms as the Perl 5 programming language system itself.
 #
-package ASPEER::Markdown::Publish::MkDocs;
+package Markdown::Publish::MkDocs;
 
 
 #  Compiler pragma and package variables
@@ -19,8 +19,8 @@ use warnings;
 
 #  Parent and supporting packages
 #
-use ASPEER::Markdown::Publish ();
-use ASPEER::Markdown::Publish::Constant;
+use Markdown::Publish ();
+use Markdown::Publish::Constant;
 use Cwd qw(abs_path);
 use File::Spec;
 use JSON::PP qw(encode_json);
@@ -28,8 +28,8 @@ use JSON::PP qw(encode_json);
 
 #  Inheritance and version information
 #
-@ISA=qw(ASPEER::Markdown::Publish);
-$VERSION='0.001';
+@ISA=qw(Markdown::Publish);
+$VERSION='1.001';
 
 
 #  Done
@@ -121,13 +121,13 @@ __END__
 
 # NAME
 
-ASPEER::Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
+Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish::MkDocs;
-my $publish_or=ASPEER::Markdown::Publish::MkDocs->new({sources => ['doc']});
+use Markdown::Publish::MkDocs;
+my $publish_or=Markdown::Publish::MkDocs->new({sources => ['doc']});
 $publish_or->build();
 ```
 
@@ -150,21 +150,30 @@ for `index.md`. Its original URL remains available for existing links.
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish`
+`Markdown::Publish`
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =end markdown
 
 
 =head1 NAME
 
-ASPEER::Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
+Markdown::Publish::MkDocs - publish distribution documentation with MkDocs
 
 
 =head1 SYNOPSIS
 
 
- use ASPEER::Markdown::Publish::MkDocs;
- my $publish_or=ASPEER::Markdown::Publish::MkDocs->new({sources => ['doc']});
+ use Markdown::Publish::MkDocs;
+ my $publish_or=Markdown::Publish::MkDocs->new({sources => ['doc']});
  $publish_or->build();
 
 =head1 DESCRIPTION
@@ -187,6 +196,17 @@ for C<index.md>. Its original URL remains available for existing links.
 
 =head1 SEE ALSO
 
-C<ASPEER::Markdown::Publish>
+C<Markdown::Publish>
+
+
+=head1 AUTHOR
+
+Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
+
+
+=head1 LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =cut

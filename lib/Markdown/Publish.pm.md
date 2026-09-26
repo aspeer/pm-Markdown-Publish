@@ -1,14 +1,14 @@
 # NAME
 
-ASPEER::Markdown::Publish - common documentation publication operations
+Markdown::Publish - common documentation publication operations
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish;
+use Markdown::Publish;
 
-my $publish_or=ASPEER::Markdown::Publish->new({
-    module  => 'ASPEER::Markdown::Publish::MkDocs',
+my $publish_or=Markdown::Publish->new({
+    module  => 'Markdown::Publish::MkDocs',
     sources => ['doc'],
     config  => 'doc/mkdocs/mkdocs.yml',
 });
@@ -42,7 +42,7 @@ page becomes the home page in each engine; its original URL remains available.
 
 # CONFIGURATION
 
-The default engine is `ASPEER::Markdown::Publish::MkDocs`. Select another class
+The default engine is `Markdown::Publish::MkDocs`. Select another class
 with `module`. `MARKDOWN_PUBLISH_MODULE` overrides `module`, including
 when it comes from a JSON file or MakeMaker metadata. The `mkdocs`, `vitepress`,
 `docusaurus`, and `starlight` shortcuts select the bundled publishers. A fully
@@ -51,7 +51,7 @@ flat, rather than nested beneath engine names:
 
 ```perl
 {
-    module  => 'ASPEER::Markdown::Publish::Docusaurus',
+    module  => 'Markdown::Publish::Docusaurus',
     sources => ['doc'],
     name    => 'Example documentation',
     config  => 'doc/docusaurus/docusaurus.config.js',
@@ -176,10 +176,10 @@ update its settings; review its config before invoking this remote action.
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish::MkDocs`,
-`ASPEER::Markdown::Publish::VitePress`,
-`ASPEER::Markdown::Publish::Docusaurus`,
-`ASPEER::Markdown::Publish::Starlight`,
+`Markdown::Publish::MkDocs`,
+`Markdown::Publish::VitePress`,
+`Markdown::Publish::Docusaurus`,
+`Markdown::Publish::Starlight`,
 `ASPEER::MakeMaker::Markdown::Publish`
 
 # AUTHOR
@@ -188,6 +188,6 @@ Andrew Speer <andrew.speer@isolutions.com.au>
 
 # LICENSE AND COPYRIGHT
 
-This file is part of ASPEER::Markdown::Publish. Copyright (c) 2026 Andrew
+This file is part of Markdown::Publish. Copyright (c) 2026 Andrew
 Speer. This is free software; you can redistribute it and/or modify it under
 the same terms as Perl 5.

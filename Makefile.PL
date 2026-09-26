@@ -34,10 +34,10 @@ if ($mm_ver=~/_/) {
     die $@ if $@;
 }
 my %WriteMakefile=(
-    NAME             => 'ASPEER::Markdown::Publish',
-    DISTNAME         => 'ASPEER-Markdown-Publish',
-    VERSION_FROM     => 'lib/ASPEER/Markdown/Publish.pm',
-    ABSTRACT_FROM    => 'lib/ASPEER/Markdown/Publish.pm',
+    NAME             => 'Markdown::Publish',
+    DISTNAME         => 'Markdown-Publish',
+    VERSION_FROM     => 'lib/Markdown/Publish.pm',
+    ABSTRACT_FROM    => 'lib/Markdown/Publish.pm',
     EXE_FILES        => ['bin/markdown-publish'],
     LICENSE          => 'perl',
     AUTHOR           => 'Andrew Speer <andrew.speer@isolutions.com.au>',
@@ -47,7 +47,7 @@ my %WriteMakefile=(
         'Exporter'     => 0,
         'File::Copy'   => 0,
         'File::Find'   => 0,
-        'File::Path'   => 0,
+        'File::Path'   => '2.07',
         'File::Spec'   => 0,
         'File::Temp'   => 0,
         'Getopt::Long' => 0,
@@ -69,27 +69,27 @@ my %WriteMakefile=(
         prereqs     => {
             configure => {
                 suggests => {
-                    'ASPEER::MakeMaker::Markdown::Pod'     => '0.012',
-                    'ASPEER::MakeMaker::Markdown::Publish' => '0.001',
+                    'ASPEER::MakeMaker::Markdown::Pod'     => '1.010',
+                    'ASPEER::MakeMaker::Markdown::Publish' => '1.001',
                 },
             },
         },
         x_documentation => {
             publish => {
                 module  => 'mkdocs',
-                name    => 'ASPEER::Markdown::Publish',
+                name    => 'Markdown::Publish',
                 sources => ['doc'],
             },
         },
         resources   => {
             bugtracker => {
-                web => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish/issues',
+                web => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish/issues',
             },
-            homepage   => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish',
+            homepage   => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish',
             repository => {
                 type => 'git',
-                url  => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish.git',
-                web  => 'https://gitea.isolutions.com.au/aspeer/pm-ASPEER-Markdown-Publish',
+                url  => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish.git',
+                web  => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish',
             },
         },
     },

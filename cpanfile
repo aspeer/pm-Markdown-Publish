@@ -5,7 +5,7 @@ requires 'Cwd';
 requires 'Exporter';
 requires 'File::Copy';
 requires 'File::Find';
-requires 'File::Path';
+requires 'File::Path', '2.07';
 requires 'File::Spec';
 requires 'Getopt::Long';
 requires 'strict';
@@ -16,6 +16,7 @@ on configure => sub {
     requires 'ExtUtils::MakeMaker';
     requires 'perl', '5.008';
     requires 'version';
-    suggests 'ASPEER::MakeMaker::Markdown::Pod', '0.012';
+    suggests 'ASPEER::MakeMaker::Markdown::Pod', '1.010';
+    suggests 'ASPEER::MakeMaker::Markdown::Publish', '1.001';
 };
 on test => sub { requires 'Test::More'; };

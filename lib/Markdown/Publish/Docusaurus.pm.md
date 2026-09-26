@@ -1,12 +1,12 @@
 # NAME
 
-ASPEER::Markdown::Publish::Docusaurus - publish distribution documentation with Docusaurus
+Markdown::Publish::Docusaurus - publish distribution documentation with Docusaurus
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish::Docusaurus;
-my $publish_or=ASPEER::Markdown::Publish::Docusaurus->new({sources => ['doc']});
+use Markdown::Publish::Docusaurus;
+my $publish_or=Markdown::Publish::Docusaurus->new({sources => ['doc']});
 $publish_or->build();
 ```
 
@@ -34,4 +34,13 @@ module.exports = (config) => ({
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish`
+`Markdown::Publish`
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.

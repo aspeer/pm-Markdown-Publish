@@ -1,4 +1,4 @@
-ASPEER::Markdown::Publish
+Markdown::Publish
 
 Build, preview, and publish Markdown documentation from Perl
 distribution trees with MkDocs, VitePress, Docusaurus, or Astro
@@ -36,24 +36,23 @@ MkDocs is the default engine. Select another with module in
 doc/project.json or with --module. MARKDOWN_PUBLISH_MODULE overrides
 either selection when set. The mkdocs, vitepress, docusaurus, and
 starlight shortcuts select the bundled publishers. A fully qualified
-class name may select another installed ASPEER::Markdown::Publish
-subclass. For example,
-MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve. The constants in
-ASPEER::Markdown::Publish::Constant may also be overridden by matching
-environment variables or an adjacent Constant.pm.local file. Settings
-include source directories, engine configuration path, output directory,
-publication branch, deployment base, and executable names. For generated
-VitePress, Docusaurus, and Starlight configuration, base maps to the
-engine's deployment base path; an authored engine configuration remains
-authoritative. Set config_extend to customise generated defaults without
-replacing them. MkDocs inherits the supplied YAML; the Node publishers
-call an extension function with their generated configuration and
-publication context. It cannot be combined with the authoritative config
-setting. See the engine module documentation for its extension-module
-shape. For npm-based engines, installation start and completion are
-always reported. Set MARKDOWN_PUBLISH_NPM_VERBOSE=1 to show npm's
-installation output as well. To listen on another interface and port
-with any publisher, run
+class name may select another installed Markdown::Publish subclass. For
+example, MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve. The
+constants in Markdown::Publish::Constant may also be overridden by
+matching environment variables or an adjacent Constant.pm.local file.
+Settings include source directories, engine configuration path, output
+directory, publication branch, deployment base, and executable names.
+For generated VitePress, Docusaurus, and Starlight configuration, base
+maps to the engine's deployment base path; an authored engine
+configuration remains authoritative. Set config_extend to customise
+generated defaults without replacing them. MkDocs inherits the supplied
+YAML; the Node publishers call an extension function with their
+generated configuration and publication context. It cannot be combined
+with the authoritative config setting. See the engine module
+documentation for its extension-module shape. For npm-based engines,
+installation start and completion are always reported. Set
+MARKDOWN_PUBLISH_NPM_VERBOSE=1 to show npm's installation output as
+well. To listen on another interface and port with any publisher, run
 MARKDOWN_PUBLISH_HOST=0.0.0.0 MARKDOWN_PUBLISH_PORT=8002 make publish_serve.
 Without these settings, each publisher keeps its existing local server
 address.
@@ -75,7 +74,7 @@ neither commits nor pushes Git. Wrangler's existing login or environment
 supplies authentication.
 
 See API details and examples. Each engine has its own module under
-ASPEER::Markdown::Publish.
+Markdown::Publish.
 
 ASPEER::MakeMaker::Markdown::Publish supplies equivalent Makefile
 targets and passes the META_MERGE.x_documentation.publish field to this

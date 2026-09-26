@@ -1,14 +1,17 @@
 #!/usr/bin/env perl
 
+#  This software is copyright (c) 2026 by Andrew Speer <andrew.speer@isolutions.com.au>.
+#  It may be distributed under the same terms as Perl itself.
+
 use strict;
 use vars qw($VERSION);
 use warnings;
 
 use Getopt::Long qw(GetOptions);
-use ASPEER::Markdown::Publish;
-use ASPEER::Markdown::Publish::Constant;
+use Markdown::Publish;
+use Markdown::Publish::Constant;
 
-$VERSION='0.001';
+$VERSION='1.001';
 
 
 sub main {
@@ -41,15 +44,15 @@ sub main {
         if defined($opt{'module'}) && ($opt{'config'} || -f $MARKDOWN_PUBLISH_CONFIG_FN);
     my $publish_or;
     if ($opt{'config'}) {
-        $publish_or=ASPEER::Markdown::Publish->load_config($opt{'config'});
+        $publish_or=Markdown::Publish->load_config($opt{'config'});
     }
     elsif (-f $MARKDOWN_PUBLISH_CONFIG_FN) {
-        $publish_or=ASPEER::Markdown::Publish->load_config($MARKDOWN_PUBLISH_CONFIG_FN);
+        $publish_or=Markdown::Publish->load_config($MARKDOWN_PUBLISH_CONFIG_FN);
     }
     else {
         my %config;
         $config{'module'}=$opt{'module'} if defined($opt{'module'});
-        $publish_or=ASPEER::Markdown::Publish->new(\%config);
+        $publish_or=Markdown::Publish->new(\%config);
     }
     $publish_or->{'sources'}=\@source_dn if @source_dn;
     foreach my $name (qw(name base output branch)) {
@@ -104,6 +107,15 @@ implied by the `origin` repository name: `/<repository>/`, or `/` for an
 
 `--version` prints the installed program version.
 
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
+
 =end markdown
 
 
@@ -142,5 +154,16 @@ implied by the C<origin> repository name: C<<< /<repository>/ >>>, or C</> for a
 C<<< <owner>.github.io >>> repository.
 
 C<--version> prints the installed program version.
+
+
+=head1 AUTHOR
+
+Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
+
+
+=head1 LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =cut

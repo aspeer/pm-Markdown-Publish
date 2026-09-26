@@ -8,6 +8,6 @@ site/
 *.pm.local
 Markdown-MkDocs-*/
 Markdown-MkDocs-*.tar.gz
-ASPEER-Markdown-Publish-*/
-ASPEER-Markdown-Publish-*.tar.gz
+Markdown-Publish-*/
+Markdown-Publish-*.tar.gz
 /.markdown-pod.json

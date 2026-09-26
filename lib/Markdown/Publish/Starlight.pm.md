@@ -1,12 +1,12 @@
 # NAME
 
-ASPEER::Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
+Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish::Starlight;
-my $publish_or=ASPEER::Markdown::Publish::Starlight->new({sources => ['doc']});
+use Markdown::Publish::Starlight;
+my $publish_or=Markdown::Publish::Starlight->new({sources => ['doc']});
 $publish_or->build();
 ```
 
@@ -44,4 +44,13 @@ export default ({astro, starlight}) => ({
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish`
+`Markdown::Publish`
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.

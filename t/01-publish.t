@@ -11,11 +11,11 @@ use File::Temp qw(tempdir);
 use JSON::PP qw(decode_json encode_json);
 use Test::More;
 
-use ASPEER::Markdown::Publish;
-use ASPEER::Markdown::Publish::MkDocs;
-use ASPEER::Markdown::Publish::VitePress;
-use ASPEER::Markdown::Publish::Docusaurus;
-use ASPEER::Markdown::Publish::Starlight;
+use Markdown::Publish;
+use Markdown::Publish::MkDocs;
+use Markdown::Publish::VitePress;
+use Markdown::Publish::Docusaurus;
+use Markdown::Publish::Starlight;
 
 local $ENV{'MARKDOWN_PUBLISH_MODULE'};
 delete($ENV{'MARKDOWN_PUBLISH_MODULE'});
@@ -47,7 +47,7 @@ sub slurp {
 #  Work entirely inside a disposable distribution tree
 #
 my $cwd=getcwd();
-my $constant_fn=abs_path($INC{'ASPEER/Markdown/Publish/Constant.pm'});
+my $constant_fn=abs_path($INC{'Markdown/Publish/Constant.pm'});
 my $temporary_dn=tempdir(CLEANUP => 1);
 chdir($temporary_dn) || die "unable to chdir $temporary_dn: $!";
 make_path('doc/mkdocs', 'doc/reference', 'lib/Sample', 'bin/nested', 'config');
@@ -59,7 +59,7 @@ blurp('bin/nested/example.md', "# example\n\nUtility documentation.\n");
 
 #  doc is the default publication boundary when present
 #
-my $publish_or=ASPEER::Markdown::Publish::MkDocs->new();
+my $publish_or=Markdown::Publish::MkDocs->new();
 is($publish_or->markdown_title('Cloudflare/API.pm.md',
     "# Cloudflare::API #\n\n# NAME #\n"), 'Cloudflare::API',
     'closing ATX hash is omitted from the page title');
@@ -107,7 +107,7 @@ unlink('doc/index.md') || die "unable to remove disposable home page: $!";
 
 #  Explicit lib/bin sources retain their established publication paths
 #
-$publish_or=ASPEER::Markdown::Publish::MkDocs->new({sources => [qw(doc lib bin)]});
+$publish_or=Markdown::Publish::MkDocs->new({sources => [qw(doc lib bin)]});
 (undef, $docs_dn, $pages_ar)=$publish_or->prepare_docs();
 ok(-f "$docs_dn/modules/Sample_Module.md", 'explicit lib source publishes module sidecar');
 ok(-f "$docs_dn/utilities/nested/example.md", 'explicit bin source publishes utility sidecar');
@@ -116,7 +116,7 @@ ok(-f "$docs_dn/utilities/nested/example.md", 'explicit bin source publishes uti
 #  Nested documents alone do not become navigation pages
 #
 unlink('doc/guide.md') || die "unable to remove disposable guide: $!";
-eval {ASPEER::Markdown::Publish::MkDocs->new()->prepare_docs()};
+eval {Markdown::Publish::MkDocs->new()->prepare_docs()};
 like($@, qr/no Markdown documents discovered/,
     'nested-only doc does not fall back to sidecars');
 blurp('doc/guide.md', "# Guide\n\nText.\n");
@@ -127,21 +127,21 @@ blurp('doc/guide.md', "# Guide\n\nText.\n");
 blurp('config/project.json', encode_json({
     x_documentation => {
         publish => {
-            module  => 'ASPEER::Markdown::Publish::MkDocs',
+            module  => 'Markdown::Publish::MkDocs',
             sources => ['doc'],
             config  => 'doc/mkdocs/custom.yml'
         }
     }
 }));
-$publish_or=ASPEER::Markdown::Publish->load_config('config/project.json');
+$publish_or=Markdown::Publish->load_config('config/project.json');
 is_deeply($publish_or->{'sources'}, ['doc'], 'metadata publication sources loaded');
-isa_ok($publish_or, 'ASPEER::Markdown::Publish::MkDocs');
+isa_ok($publish_or, 'Markdown::Publish::MkDocs');
 is($publish_or->{'config'}, 'doc/mkdocs/custom.yml',
     'selected backend configuration loaded');
-isa_ok(ASPEER::Markdown::Publish->new({config_file => 'config/project.json'}),
-    'ASPEER::Markdown::Publish::MkDocs');
-eval {ASPEER::Markdown::Publish->new({
-    config_file => 'config/project.json', module => 'ASPEER::Markdown::Publish::MkDocs'
+isa_ok(Markdown::Publish->new({config_file => 'config/project.json'}),
+    'Markdown::Publish::MkDocs');
+eval {Markdown::Publish->new({
+    config_file => 'config/project.json', module => 'Markdown::Publish::MkDocs'
 })};
 like($@, qr/config_file cannot be combined/, 'file and inline settings cannot conflict');
 
@@ -154,7 +154,7 @@ like(slurp($mkdocs_fn), qr/^INHERIT: .*custom\.yml/m,
     'custom MkDocs configuration is inherited');
 like(slurp($mkdocs_fn), qr/^docs_dir: /m, 'assembled documentation overrides docs_dir');
 blurp('doc/mkdocs/extend.yml', "site_name: Extended\n");
-my $extended_mkdocs_or=ASPEER::Markdown::Publish::MkDocs->new({
+my $extended_mkdocs_or=Markdown::Publish::MkDocs->new({
     sources => ['doc'], config_extend => 'doc/mkdocs/extend.yml'
 });
 my $extended_mkdocs_fn=$extended_mkdocs_or->prepare(0);
@@ -185,7 +185,7 @@ Term
 : remains example text
 ```
 MARKDOWN
-$publish_or=ASPEER::Markdown::Publish::VitePress->new({
+$publish_or=Markdown::Publish::VitePress->new({
     sources => ['doc'], base => '/sample-docs/'
 });
 my (undef, $generated_vitepress_dn, $generated_vitepress_fn)=$publish_or->prepare();
@@ -217,13 +217,13 @@ unlike($vitepress_formatting, qr/\{target=/,
 like($vitepress_formatting, qr/```text\nTerm\n\n: remains example text\n```/,
     'definition syntax inside a fenced example is unchanged');
 
-$publish_or=ASPEER::Markdown::Publish::VitePress->new({
+$publish_or=Markdown::Publish::VitePress->new({
     sources => ['doc'], config => 'config/vitepress.mts'
 });
 my (undef, $vitepress_dn, $vitepress_config_fn)=$publish_or->prepare();
 is($vitepress_config_fn, abs_path('config/vitepress.mts'),
     'custom VitePress configuration location retained');
-$publish_or=ASPEER::Markdown::Publish::VitePress->new({
+$publish_or=Markdown::Publish::VitePress->new({
     sources => ['doc'], name => 'Extended VitePress', base => '/sample-docs/',
     config_extend => 'config/vitepress.extend.mjs'
 });
@@ -240,7 +240,7 @@ blurp('config/docusaurus.js', "module.exports = { title: 'Custom' };\n");
 blurp('config/docusaurus.extend.cjs',
     "module.exports = (config, context) => ({ ...config, tagline: context.name });\n");
 blurp('doc/guide.md', "# Guide {#guide}\n\nText.\n");
-$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
+$publish_or=Markdown::Publish::Docusaurus->new({
     sources => ['doc'], base => '/sample-docs/'
 });
 my (undef, $generated_docusaurus_dn, $generated_docusaurus_fn)=
@@ -274,7 +274,7 @@ like($docusaurus_formatting, qr/- \*\*`handler=METHOD`\*\*\n\n  Call a handler\.
     'Docusaurus receives portable CommonMark definition items');
 unlike($docusaurus_formatting, qr/\{target=/,
     'Docusaurus does not receive visible link attributes');
-$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
+$publish_or=Markdown::Publish::Docusaurus->new({
     sources => ['doc'], config => 'config/docusaurus.js'
 });
 my (undef, $docusaurus_dn, $docusaurus_config_fn)=$publish_or->prepare();
@@ -282,7 +282,7 @@ is($docusaurus_config_fn, abs_path('config/docusaurus.js'),
     'custom Docusaurus configuration location retained');
 like(slurp("$docusaurus_dn/docs/guide.md"), qr/<a id="guide"><\/a>/,
     'Docusaurus receives explicit HTML heading anchors');
-$publish_or=ASPEER::Markdown::Publish::Docusaurus->new({
+$publish_or=Markdown::Publish::Docusaurus->new({
     sources => ['doc'], name => 'Extended Docusaurus', base => '/sample-docs/',
     config_extend => 'config/docusaurus.extend.cjs'
 });
@@ -299,7 +299,7 @@ blurp('config/astro.mjs', "export default {};\n");
 blurp('config/starlight.extend.mjs',
     "export default ({ astro, starlight }) => ({ astro, starlight: { ...starlight, description: 'Extended' } });\n");
 blurp('doc/ModuleName.md', "# Mixed Case Module\n\nText.\n");
-$publish_or=ASPEER::Markdown::Publish::Starlight->new({
+$publish_or=Markdown::Publish::Starlight->new({
     sources => ['doc'], base => '/sample-docs/'
 });
 my (undef, $generated_starlight_dn, $generated_starlight_fn)=$publish_or->prepare();
@@ -337,7 +337,7 @@ unlike($starlight_formatting, qr/\{#|\{target=/,
 like($starlight_formatting, qr/  <a id="handler_example"><\/a>\n  ```perl/,
     'Starlight receives a portable code language and anchor');
 
-$publish_or=ASPEER::Markdown::Publish::Starlight->new({
+$publish_or=Markdown::Publish::Starlight->new({
     sources => ['doc'], config => 'config/astro.mjs'
 });
 my (undef, $starlight_dn, $starlight_config_fn)=$publish_or->prepare();
@@ -348,7 +348,7 @@ like(slurp($starlight_config_fn), qr/mergeConfig\(authored, \{ markdown: \{ proc
 my $authored_starlight_config_fn=abs_path('config/astro.mjs');
 like(slurp($starlight_config_fn), qr/\Q$authored_starlight_config_fn\E/,
     'temporary configuration imports the authored configuration');
-$publish_or=ASPEER::Markdown::Publish::Starlight->new({
+$publish_or=Markdown::Publish::Starlight->new({
     sources => ['doc'], name => 'Extended Starlight', base => '/sample-docs/',
     config_extend => 'config/starlight.extend.mjs'
 });
@@ -361,27 +361,27 @@ like($extended_starlight, qr/const context = .*"name":"Extended Starlight"/,
 like($extended_starlight, qr/starlight\.extend\.mjs/,
     'Starlight extension is imported from its authored location');
 
-eval {ASPEER::Markdown::Publish::VitePress->new({
+eval {Markdown::Publish::VitePress->new({
     sources => ['doc'], config => 'config/vitepress.mts',
     config_extend => 'config/vitepress.extend.mjs'
 })->prepare()};
 like($@, qr/config and config_extend cannot be combined/,
     'authoritative and extending configuration cannot be combined');
 
-eval {ASPEER::Markdown::Publish::VitePress->new({
+eval {Markdown::Publish::VitePress->new({
     sources => ['doc'], config_extend => 'config/missing.extend.mjs'
 })->prepare()};
 like($@, qr/VitePress configuration extension not found/,
     'missing configuration extension is reported');
 
-eval {ASPEER::Markdown::Publish::MkDocs->new({
+eval {Markdown::Publish::MkDocs->new({
     sources => ['doc'], config_extend => 'doc/mkdocs/extend.yml',
     config_mode => 'direct'
 })->prepare()};
 like($@, qr/config_extend cannot be used with direct MkDocs configuration/,
     'MkDocs extension cannot bypass generated publication settings');
 
-eval {ASPEER::Markdown::Publish::VitePress->new({
+eval {Markdown::Publish::VitePress->new({
     sources => ['doc'], base => 'sample-docs'
 })->prepare()};
 like($@, qr/publication base must start and end with/,
@@ -390,7 +390,7 @@ like($@, qr/publication base must start and end with/,
 {
     package TestGitHubBase;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish);
+    @ISA=qw(Markdown::Publish);
     sub command {
         my ($self, @command)=@_;
         return $self->{'remote'} if $command[1] eq 'config' && exists($self->{'remote'});
@@ -419,7 +419,7 @@ is(TestGitHubBase->new({
 SKIP: {
     skip 'set STARLIGHT_TEST=1 to run a real Astro build', 4
         unless $ENV{'STARLIGHT_TEST'};
-    my $real_or=ASPEER::Markdown::Publish::Starlight->new({
+    my $real_or=Markdown::Publish::Starlight->new({
         sources => ['doc'], output => "$temporary_dn/starlight-site",
         config_extend => 'config/starlight.extend.mjs'
     });
@@ -441,7 +441,7 @@ SKIP: {
 {
     package TestBuild;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish::Starlight);
+    @ISA=qw(Markdown::Publish::Starlight);
     sub npm_install {return 1}
     sub system_in_dir {
         my ($self, $dir, @command)=@_;
@@ -458,7 +458,7 @@ is($build_or->{'command'}[5], 'astro.config.mjs',
 {
     package TestServeMkDocs;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish::MkDocs);
+    @ISA=qw(Markdown::Publish::MkDocs);
     sub prepare {return 'mkdocs.yml'}
     sub system_command {my ($self, @command)=@_; $self->{'command'}=\@command; return 1}
 }
@@ -471,8 +471,8 @@ $serve_or->serve();
 ok(!grep {$_ eq '-a'} @{$serve_or->{'command'}},
     'MkDocs keeps its normal listener when globals are undefined');
 {
-    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST='0.0.0.0';
-    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
+    local $Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST='0.0.0.0';
+    local $Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
     $serve_or=TestServeMkDocs->new();
     $serve_or->serve();
     is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '0.0.0.0:8002'],
@@ -483,8 +483,8 @@ ok(!grep {$_ eq '-a'} @{$serve_or->{'command'}},
         'explicit MkDocs address takes precedence');
 }
 {
-    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST;
-    local $ASPEER::Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
+    local $Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_HOST;
+    local $Markdown::Publish::MkDocs::MARKDOWN_PUBLISH_PORT=8002;
     $serve_or=TestServeMkDocs->new();
     $serve_or->serve();
     is_deeply([@{$serve_or->{'command'}}[-2, -1]], ['-a', '127.0.0.1:8002'],
@@ -497,7 +497,7 @@ foreach my $spec_ar (
     ['Starlight', 'site', 'astro.config.mjs', 8003, 4321]
 ) {
     my ($name, $dir, $config, $port, $default_port)=@{$spec_ar};
-    my $class="ASPEER::Markdown::Publish::$name";
+    my $class="Markdown::Publish::$name";
     my $test_class="TestServe$name";
     {
         no strict qw(refs);
@@ -541,127 +541,127 @@ foreach my $spec_ar (
 
 #  Factory dispatch uses MkDocs unless configuration or environment selects a module
 #
-my $factory_or=ASPEER::Markdown::Publish->new({
-    module => 'ASPEER::Markdown::Publish::MkDocs', sources => ['doc']
+my $factory_or=Markdown::Publish->new({
+    module => 'Markdown::Publish::MkDocs', sources => ['doc']
 });
-isa_ok($factory_or, 'ASPEER::Markdown::Publish::MkDocs');
-isa_ok(ASPEER::Markdown::Publish->new({sources => ['doc']}),
-    'ASPEER::Markdown::Publish::MkDocs', 'missing module defaults to MkDocs');
+isa_ok($factory_or, 'Markdown::Publish::MkDocs');
+isa_ok(Markdown::Publish->new({sources => ['doc']}),
+    'Markdown::Publish::MkDocs', 'missing module defaults to MkDocs');
 blurp('config/default-project.json', encode_json({publish => {sources => ['doc']}}));
-isa_ok(ASPEER::Markdown::Publish->load_config('config/default-project.json'),
-    'ASPEER::Markdown::Publish::MkDocs', 'configuration without module defaults to MkDocs');
+isa_ok(Markdown::Publish->load_config('config/default-project.json'),
+    'Markdown::Publish::MkDocs', 'configuration without module defaults to MkDocs');
 foreach my $spec_ar (
-    [mkdocs     => 'ASPEER::Markdown::Publish::MkDocs'],
-    [vitepress  => 'ASPEER::Markdown::Publish::VitePress'],
-    [docusaurus => 'ASPEER::Markdown::Publish::Docusaurus'],
-    [starlight  => 'ASPEER::Markdown::Publish::Starlight']
+    [mkdocs     => 'Markdown::Publish::MkDocs'],
+    [vitepress  => 'Markdown::Publish::VitePress'],
+    [docusaurus => 'Markdown::Publish::Docusaurus'],
+    [starlight  => 'Markdown::Publish::Starlight']
 ) {
     my ($alias, $publisher)=@{$spec_ar};
-    isa_ok(ASPEER::Markdown::Publish->new({
+    isa_ok(Markdown::Publish->new({
         module => $alias, sources => ['doc']
     }), $publisher, "$alias publisher shortcut");
 }
-isa_ok(ASPEER::Markdown::Publish->new({module => 'Docusaurus'}),
-    'ASPEER::Markdown::Publish::Docusaurus',
+isa_ok(Markdown::Publish->new({module => 'Docusaurus'}),
+    'Markdown::Publish::Docusaurus',
     'publisher shortcuts are case insensitive');
 blurp('config/alias-project.json', encode_json({publish => {
     module => 'vitepress', sources => ['doc']
 }}));
-isa_ok(ASPEER::Markdown::Publish->load_config('config/alias-project.json'),
-    'ASPEER::Markdown::Publish::VitePress',
+isa_ok(Markdown::Publish->load_config('config/alias-project.json'),
+    'Markdown::Publish::VitePress',
     'JSON configuration accepts a publisher shortcut');
 
 {
     package Local::Markdown::Publisher;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish);
+    @ISA=qw(Markdown::Publish);
 }
 {
     local $INC{'Local/Markdown/Publisher.pm'}=__FILE__;
-    isa_ok(ASPEER::Markdown::Publish->new({
+    isa_ok(Markdown::Publish->new({
         module => 'Local::Markdown::Publisher'
     }), 'Local::Markdown::Publisher', 'external publisher module accepted');
 }
 {
-    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='ASPEER::Markdown::Publish::VitePress';
-    isa_ok(ASPEER::Markdown::Publish->new({module => 'ASPEER::Markdown::Publish::MkDocs'}),
-        'ASPEER::Markdown::Publish::VitePress', 'environment overrides inline module');
-    isa_ok(ASPEER::Markdown::Publish->load_config('config/project.json'),
-        'ASPEER::Markdown::Publish::VitePress', 'environment overrides JSON module');
+    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='Markdown::Publish::VitePress';
+    isa_ok(Markdown::Publish->new({module => 'Markdown::Publish::MkDocs'}),
+        'Markdown::Publish::VitePress', 'environment overrides inline module');
+    isa_ok(Markdown::Publish->load_config('config/project.json'),
+        'Markdown::Publish::VitePress', 'environment overrides JSON module');
 }
 {
     local $ENV{'MARKDOWN_PUBLISH_MODULE'}='docusaurus';
-    isa_ok(ASPEER::Markdown::Publish->new({
-        module => 'ASPEER::Markdown::Publish::MkDocs'
-    }), 'ASPEER::Markdown::Publish::Docusaurus',
+    isa_ok(Markdown::Publish->new({
+        module => 'Markdown::Publish::MkDocs'
+    }), 'Markdown::Publish::Docusaurus',
         'environment shortcut selects publisher');
 }
 {
     local $ENV{'MARKDOWN_PUBLISH_MODULE'}='Missing::Publisher';
-    eval {ASPEER::Markdown::Publish->new({})};
+    eval {Markdown::Publish->new({})};
     like($@, qr/unable to load publication module Missing::Publisher/,
         'missing environment module rejected');
 }
-eval {ASPEER::Markdown::Publish->new({module => 'Missing::Publisher'})};
+eval {Markdown::Publish->new({module => 'Missing::Publisher'})};
 like($@, qr/unable to load publication module Missing::Publisher/,
     'missing external module rejected');
-eval {ASPEER::Markdown::Publish->new({module => 'JSON::PP'})};
-like($@, qr/JSON::PP is not an ASPEER::Markdown::Publish subclass/,
+eval {Markdown::Publish->new({module => 'JSON::PP'})};
+like($@, qr/JSON::PP is not a Markdown::Publish subclass/,
     'unrelated installed module rejected');
 
 #  A fresh interpreter loads permanent local preferences, then matching
 #  environment variables take precedence before constants are exported.
 #
-make_path('local-lib/ASPEER/Markdown/Publish');
-blurp('local-lib/ASPEER/Markdown/Publish/Constant.pm', slurp($constant_fn));
-my $local_fn='local-lib/ASPEER/Markdown/Publish/Constant.pm.local';
+make_path('local-lib/Markdown/Publish');
+blurp('local-lib/Markdown/Publish/Constant.pm', slurp($constant_fn));
+my $local_fn='local-lib/Markdown/Publish/Constant.pm.local';
 blurp($local_fn, <<'LOCAL_CONSTANTS');
 +{
-    MARKDOWN_PUBLISH_MODULE    => 'ASPEER::Markdown::Publish::VitePress',
+    MARKDOWN_PUBLISH_MODULE    => 'Markdown::Publish::VitePress',
     MARKDOWN_PUBLISH_OUTPUT_DN => 'local-site',
     MARKDOWN_PUBLISH_BRANCH    => 'local-pages'
 }
 LOCAL_CONSTANTS
-my $constant_code='print join("|", map {$ASPEER::Markdown::Publish::Constant::Constant{$_}} '.
+my $constant_code='print join("|", map {$Markdown::Publish::Constant::Constant{$_}} '.
     'qw(MARKDOWN_PUBLISH_MODULE MARKDOWN_PUBLISH_OUTPUT_DN MARKDOWN_PUBLISH_BRANCH))';
 my ($constant_output, $constant_error);
-is($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE, 0,
+is($Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE, 0,
     'npm installation is quiet by default');
-ok(!defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST) &&
-    !defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT),
+ok(!defined($Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST) &&
+    !defined($Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT),
     'global listen settings are undefined by default');
 {
     local $ENV{'MARKDOWN_PUBLISH_OUTPUT_DN'};
     local $ENV{'MARKDOWN_PUBLISH_BRANCH'};
     delete($ENV{'MARKDOWN_PUBLISH_OUTPUT_DN'});
     delete($ENV{'MARKDOWN_PUBLISH_BRANCH'});
-    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
+    run3([$^X, '-Ilocal-lib', '-MMarkdown::Publish::Constant',
         '-e', $constant_code], \undef, \$constant_output, \$constant_error);
     is($?, 0, 'adjacent local constants load');
-    is($constant_output, 'ASPEER::Markdown::Publish::VitePress|local-site|local-pages',
+    is($constant_output, 'Markdown::Publish::VitePress|local-site|local-pages',
         'local file overrides built-in constants');
-    run3([$^X, '-Ilocal-lib', "-I$cwd/lib", '-MASPEER::Markdown::Publish',
-        '-e', 'print ref(ASPEER::Markdown::Publish->new({}))'],
+    run3([$^X, '-Ilocal-lib', "-I$cwd/lib", '-MMarkdown::Publish',
+        '-e', 'print ref(Markdown::Publish->new({}))'],
         \undef, \$constant_output, \$constant_error);
     is($?, 0, 'publisher loads with local constants');
-    is($constant_output, 'ASPEER::Markdown::Publish::VitePress',
+    is($constant_output, 'Markdown::Publish::VitePress',
         'factory uses local publisher default');
 }
 {
-    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='ASPEER::Markdown::Publish::Docusaurus';
+    local $ENV{'MARKDOWN_PUBLISH_MODULE'}='Markdown::Publish::Docusaurus';
     local $ENV{'MARKDOWN_PUBLISH_OUTPUT_DN'}='environment-site';
     local $ENV{'MARKDOWN_PUBLISH_BRANCH'}='environment-pages';
-    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
+    run3([$^X, '-Ilocal-lib', '-MMarkdown::Publish::Constant',
         '-e', $constant_code], \undef, \$constant_output, \$constant_error);
     is($?, 0, 'matching environment constants load');
     is($constant_output,
-        'ASPEER::Markdown::Publish::Docusaurus|environment-site|environment-pages',
+        'Markdown::Publish::Docusaurus|environment-site|environment-pages',
         'environment overrides local constants');
 }
 {
     local $ENV{'MARKDOWN_PUBLISH_NPM_VERBOSE'}=1;
-    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
-        '-e', 'print $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE'],
+    run3([$^X, '-Ilocal-lib', '-MMarkdown::Publish::Constant',
+        '-e', 'print $Markdown::Publish::Constant::MARKDOWN_PUBLISH_NPM_VERBOSE'],
         \undef, \$constant_output, \$constant_error);
     is($?, 0, 'npm verbosity override loads');
     is($constant_output, '1', 'environment enables npm verbosity');
@@ -669,17 +669,17 @@ ok(!defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST) &&
 {
     local $ENV{'MARKDOWN_PUBLISH_HOST'}='0.0.0.0';
     local $ENV{'MARKDOWN_PUBLISH_PORT'}=8002;
-    run3([$^X, '-Ilocal-lib', '-MASPEER::Markdown::Publish::Constant',
-        '-e', 'print join(":", $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST, $ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT)'],
+    run3([$^X, '-Ilocal-lib', '-MMarkdown::Publish::Constant',
+        '-e', 'print join(":", $Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST, $Markdown::Publish::Constant::MARKDOWN_PUBLISH_PORT)'],
         \undef, \$constant_output, \$constant_error);
     is($?, 0, 'global listen overrides load');
     is($constant_output, '0.0.0.0:8002', 'environment sets global host and port');
     my $serve_code='package TestEnvironmentMkDocs; '.
-        'our @ISA=("ASPEER::Markdown::Publish::MkDocs"); '.
+        'our @ISA=("Markdown::Publish::MkDocs"); '.
         'sub prepare {return "mkdocs.yml"} '.
         'sub system_command {shift; print join("|", @_); return 1} '.
         'TestEnvironmentMkDocs->new()->serve()';
-    run3([$^X, "-I$cwd/lib", '-MASPEER::Markdown::Publish::MkDocs',
+    run3([$^X, "-I$cwd/lib", '-MMarkdown::Publish::MkDocs',
         '-e', $serve_code], \undef, \$constant_output, \$constant_error);
     is($?, 0, 'global listen overrides reach a publisher');
     is($constant_output, 'mkdocs|serve|-f|mkdocs.yml|-a|0.0.0.0:8002',
@@ -689,7 +689,7 @@ ok(!defined($ASPEER::Markdown::Publish::Constant::MARKDOWN_PUBLISH_HOST) &&
 {
     package TestNpmInstall;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish);
+    @ISA=qw(Markdown::Publish);
     sub system_in_dir {
         my ($self, $site_dn, @command)=@_;
         $self->{'install_command'}=[$site_dn, @command];
@@ -709,7 +709,7 @@ is_deeply($npm_or->{'install_command'},
 like($npm_status, qr/Installing TestNpmInstall npm dependencies\.\.\.\n.*installed\.\n/s,
     'quiet installation reports its start and completion');
 {
-    local $ASPEER::Markdown::Publish::MARKDOWN_PUBLISH_NPM_VERBOSE=1;
+    local $Markdown::Publish::MARKDOWN_PUBLISH_NPM_VERBOSE=1;
     local *STDERR;
     open(STDERR, '>', \$npm_status) || die "unable to capture npm status: $!";
     $npm_or->npm_install('temporary-project');
@@ -721,7 +721,7 @@ is_deeply($npm_or->{'install_command'},
 {
     package TestPublish;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish::MkDocs);
+    @ISA=qw(Markdown::Publish::MkDocs);
     sub build {my ($self)=@_; $self->{'called'}='build'; return 1}
     sub serve {my ($self)=@_; $self->{'called'}='serve'; return 1}
     sub publish_gh {my ($self)=@_; $self->{'called'}='gh'; return 1}
@@ -742,7 +742,7 @@ like($@, qr/unknown publication action/, 'unknown action rejected');
 {
     package TestGitHubPush;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish::MkDocs);
+    @ISA=qw(Markdown::Publish::MkDocs);
     sub publish_gh {
         my ($self)=@_;
         $self->{'published'}++;
@@ -769,7 +769,7 @@ is_deeply($push_or->{'push_command'},
 {
     package TestCloudflare;
     use vars qw(@ISA);
-    @ISA=qw(ASPEER::Markdown::Publish::MkDocs);
+    @ISA=qw(Markdown::Publish::MkDocs);
     sub build {
         my ($self)=@_;
         $self->{'build_count'}++;

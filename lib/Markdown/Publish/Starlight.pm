@@ -1,5 +1,5 @@
 #
-#  This file is part of ASPEER::Markdown::Publish.
+#  This file is part of Markdown::Publish.
 #
 #  This software is copyright (c) 2026 by Andrew Speer
 #  <andrew.speer@isolutions.com.au>.
@@ -7,7 +7,7 @@
 #  This is free software; you can redistribute it and/or modify it under
 #  the same terms as the Perl 5 programming language system itself.
 #
-package ASPEER::Markdown::Publish::Starlight;
+package Markdown::Publish::Starlight;
 
 
 #  Compiler pragma and package variables
@@ -19,8 +19,8 @@ use warnings;
 
 #  Parent and supporting packages
 #
-use ASPEER::Markdown::Publish ();
-use ASPEER::Markdown::Publish::Constant;
+use Markdown::Publish ();
+use Markdown::Publish::Constant;
 use Cwd qw(abs_path);
 use File::Path qw(make_path);
 use File::Spec;
@@ -29,8 +29,8 @@ use JSON::PP qw(encode_json);
 
 #  Inheritance and version information
 #
-@ISA=qw(ASPEER::Markdown::Publish);
-$VERSION='0.001';
+@ISA=qw(Markdown::Publish);
+$VERSION='1.001';
 
 
 #  Done
@@ -293,13 +293,13 @@ __END__
 
 # NAME
 
-ASPEER::Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
+Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
 
 # SYNOPSIS
 
 ```perl
-use ASPEER::Markdown::Publish::Starlight;
-my $publish_or=ASPEER::Markdown::Publish::Starlight->new({sources => ['doc']});
+use Markdown::Publish::Starlight;
+my $publish_or=Markdown::Publish::Starlight->new({sources => ['doc']});
 $publish_or->build();
 ```
 
@@ -337,21 +337,30 @@ export default ({astro, starlight}) => ({
 
 # SEE ALSO
 
-`ASPEER::Markdown::Publish`
+`Markdown::Publish`
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =end markdown
 
 
 =head1 NAME
 
-ASPEER::Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
+Markdown::Publish::Starlight - publish distribution documentation with Astro Starlight
 
 
 =head1 SYNOPSIS
 
 
- use ASPEER::Markdown::Publish::Starlight;
- my $publish_or=ASPEER::Markdown::Publish::Starlight->new({sources => ['doc']});
+ use Markdown::Publish::Starlight;
+ my $publish_or=Markdown::Publish::Starlight->new({sources => ['doc']});
  $publish_or->build();
 
 =head1 DESCRIPTION
@@ -387,6 +396,17 @@ and C<config_extend> cannot be combined.
 
 =head1 SEE ALSO
 
-C<ASPEER::Markdown::Publish>
+C<Markdown::Publish>
+
+
+=head1 AUTHOR
+
+Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
+
+
+=head1 LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =cut

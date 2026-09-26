@@ -1,4 +1,4 @@
-# ASPEER::Markdown::Publish
+# Markdown::Publish
 
 Build, preview, and publish Markdown documentation from Perl distribution
 trees with MkDocs, VitePress, Docusaurus, or Astro Starlight.
@@ -37,9 +37,9 @@ MkDocs is the default engine. Select another with `module` in
 `doc/project.json` or with `--module`. `MARKDOWN_PUBLISH_MODULE`
 overrides either selection when set. The `mkdocs`, `vitepress`, `docusaurus`,
 and `starlight` shortcuts select the bundled publishers. A fully qualified
-class name may select another installed `ASPEER::Markdown::Publish` subclass.
+class name may select another installed `Markdown::Publish` subclass.
 For example, `MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve`.
-The constants in `ASPEER::Markdown::Publish::Constant` may also be overridden
+The constants in `Markdown::Publish::Constant` may also be overridden
 by matching environment variables or an adjacent `Constant.pm.local` file.
 Settings include source directories, engine configuration path, output
 directory, publication branch, deployment base, and executable names. For
@@ -72,9 +72,9 @@ selected engine and deploys its site directory with Wrangler; it neither
 commits nor pushes Git. Wrangler's existing login or environment supplies
 authentication.
 
-See [API details](lib/ASPEER/Markdown/Publish.pm.md) and
+See [API details](lib/Markdown/Publish.pm.md) and
 [examples](examples/README.md). Each engine has its own module under
-`ASPEER::Markdown::Publish`.
+`Markdown::Publish`.
 
 `ASPEER::MakeMaker::Markdown::Publish` supplies equivalent Makefile targets and
 passes the `META_MERGE.x_documentation.publish` field to this module.

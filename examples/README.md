@@ -1,6 +1,6 @@
 # Examples
 
-Install ASPEER::Markdown::Publish and the backend used by an example first.
+Install Markdown::Publish and the backend used by an example first.
 
 - `simple/` builds an MkDocs site directly from the `doc/` boundary.
 - `configured/` uses an authored root MkDocs configuration and navigation.

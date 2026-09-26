@@ -1,12 +1,12 @@
 #
-#  This file is part of ASPEER::Markdown::Publish.
+#  This file is part of Markdown::Publish.
 #
 #  This software is copyright (c) 2026 by Andrew Speer <andrew.speer@isolutions.com.au>.
 #
 #  This is free software; you can redistribute it and/or modify it under
 #  the same terms as the Perl 5 programming language system itself.
 #
-package ASPEER::Markdown::Publish::Constant;
+package Markdown::Publish::Constant;
 
 use strict qw(vars);
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS %Constant);
@@ -14,10 +14,10 @@ use warnings;
 
 use Cwd qw(abs_path);
 
-$VERSION='0.001';
+$VERSION='1.001';
 
 %Constant=(
-    MARKDOWN_PUBLISH_MODULE      => 'ASPEER::Markdown::Publish::MkDocs',
+    MARKDOWN_PUBLISH_MODULE      => 'Markdown::Publish::MkDocs',
     MARKDOWN_PUBLISH_CONFIG_FN   => 'doc/project.json',
     MARKDOWN_PUBLISH_OUTPUT_DN   => 'site',
     MARKDOWN_PUBLISH_BRANCH      => 'gh-pages',
@@ -57,7 +57,7 @@ __END__
 
 # NAME
 
-ASPEER::Markdown::Publish::Constant - publication defaults
+Markdown::Publish::Constant - publication defaults
 
 # DESCRIPTION
 
@@ -66,14 +66,14 @@ Defines `MARKDOWN_PUBLISH_MODULE`, `MARKDOWN_PUBLISH_CONFIG_FN`,
 `MARKDOWN_PUBLISH_NPM_VERBOSE`, `MARKDOWN_PUBLISH_HOST`, and
 `MARKDOWN_PUBLISH_PORT`. Import individual scalar constants or use the default
 export set. The default publisher is
-`ASPEER::Markdown::Publish::MkDocs`.
+`Markdown::Publish::MkDocs`.
 
 An optional `Constant.pm.local` beside the installed module may return a hash
 reference of permanent overrides:
 
 ```perl
 +{
-    MARKDOWN_PUBLISH_MODULE    => 'ASPEER::Markdown::Publish::VitePress',
+    MARKDOWN_PUBLISH_MODULE    => 'Markdown::Publish::VitePress',
     MARKDOWN_PUBLISH_OUTPUT_DN => 'public'
 }
 ```
@@ -88,12 +88,21 @@ Set `MARKDOWN_PUBLISH_HOST` and `MARKDOWN_PUBLISH_PORT` to control where
 existing address and port in place. Per-engine `host`, `port`, or MkDocs
 `address` settings take precedence.
 
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
+
 =end markdown
 
 
 =head1 NAME
 
-ASPEER::Markdown::Publish::Constant - publication defaults
+Markdown::Publish::Constant - publication defaults
 
 
 =head1 DESCRIPTION
@@ -103,14 +112,14 @@ C<MARKDOWN_PUBLISH_OUTPUT_DN>, C<MARKDOWN_PUBLISH_BRANCH>,
 C<MARKDOWN_PUBLISH_NPM_VERBOSE>, C<MARKDOWN_PUBLISH_HOST>, and
 C<MARKDOWN_PUBLISH_PORT>. Import individual scalar constants or use the default
 export set. The default publisher is
-C<ASPEER::Markdown::Publish::MkDocs>.
+C<Markdown::Publish::MkDocs>.
 
 An optional C<Constant.pm.local> beside the installed module may return a hash
 reference of permanent overrides:
 
 
  +{
-     MARKDOWN_PUBLISH_MODULE    => 'ASPEER::Markdown::Publish::VitePress',
+     MARKDOWN_PUBLISH_MODULE    => 'Markdown::Publish::VitePress',
      MARKDOWN_PUBLISH_OUTPUT_DN => 'public'
  }
 Environment variables named after the constants override both the local file
@@ -122,5 +131,16 @@ Set C<MARKDOWN_PUBLISH_HOST> and C<MARKDOWN_PUBLISH_PORT> to control where
 C<publish_serve> listens. Both default to undefined, leaving each engine's
 existing address and port in place. Per-engine C<host>, C<port>, or MkDocs
 C<address> settings take precedence.
+
+
+=head1 AUTHOR
+
+Andrew Speer L<mailto:andrew.speer@isolutions.com.au>
+
+
+=head1 LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
 
 =cut

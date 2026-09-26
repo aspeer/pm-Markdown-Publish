@@ -1,31 +1,39 @@
-# Publishing documentation with ASPEER::Markdown::Publish {#introduction}
+# Publishing documentation with Markdown::Publish {#introduction}
 
-You have a Perl distribution with a guide under `doc/`, Markdown sidecars beside its modules, and perhaps a few utility manuals. You would like one command to preview those documents and another to put the finished site on GitHub Pages. That is the job of `ASPEER::Markdown::Publish`.
+This module lets you publish documentation - either in Docbook XML or Markdown format as a static site using publishing engines such as MkDocs etc. You can preview the output before pushing the finished site to GitHub Pages or another static hosting location.
 
-The module assembles the documents and hands them to one publishing engine: MkDocs, VitePress, Docusaurus, or Astro Starlight. Its companion, `ASPEER::MakeMaker::Markdown::Publish`, adds friendly `make` targets to a Perl distribution. The companion is deliberately thin. The assembly and publication work remains in `ASPEER::Markdown::Publish`, so the same setup can be driven by MakeMaker, a JSON project file, the command-line utility, or Perl code.
+The module assembles the documents and hands them to a publishing engine: MkDocs, VitePress, Docusaurus, or Astro Starlight. Its companion module, `ASPEER::MakeMaker::Markdown::Publish`, adds `make` targets to a Perl distribution Makefile. The assembly and publication stage satys in `Markdown::Publish`, so the same setup can be driven by MakeMaker, a JSON project file, the command-line utility, or Perl code.
 
-If you want the shortest path, configure the MakeMaker adapter, run `make doc`, then run `make publish_serve`. The rest of this article explains what those commands do, how source discovery works, how to customise each engine, and how to publish without accidentally mixing local builds with remote operations.
+The rest of this article explains what those commands do, how source discovery works, how to customise each engine, and how to publish without accidentally mixing local builds with remote operations.
 
-# The three parts of the workflow {#mental-model}
+# Quick start
+
+For quick start configure the MakeMaker adapter, run `make doc`, then run `make publish_serve`.
+
+    perl -MASPEER::MakeMaker::Markdown::Publish -MASPEER::MakeMaker::Markdown::Pod
+    make doc
+    make publish_serve
+
+# Workflow {#mental-model}
 
 It helps to separate documentation maintenance from site assembly and publication. They are related, but they do not have the same side effects.
 
-1.  `make doc`, supplied by `ASPEER::MakeMaker::Markdown::Pod`, converts maintained DocBook articles to Markdown and merges Markdown sidecars into Perl sources. The resulting Markdown is durable documentation.
+1.  `make doc`, supplied by `ASPEER::MakeMaker::Markdown::Pod`, converts maintained DocBook articles to Markdown and merges Markdown sidecars into Perl sources as POD documentation.
 
-2.  A build or preview asks `ASPEER::Markdown::Publish` to copy the selected Markdown and assets into a temporary assembly, create navigation, and invoke the chosen site generator. Authored source files are not rewritten during this stage.
+2.  A build or preview directs `Markdown::Publish` to copy the selected Markdown and assets into a temporary assembly, create navigation, and invoke the chosen site generator.
 
-3.  A publication action takes a completed site somewhere else. GitHub publication updates a branch; Cloudflare publication invokes Wrangler. These actions are explicit and are not hidden inside a normal build or preview.
+3.  A publication action pushes the completed site somewhere else. GitHub publication updates the "gh-pages" branch; Cloudflare publication invokes Wrangler to push as a Pages site.
 
 !!! note
 
-    The publisher consumes Markdown. DocBook is an authoring format in the
-    wider toolchain, not an input format understood directly by the site
+    The publisher step expects Markdown. DocBook is an authoring format in
+    the wider toolchain, bit is not understood directly by the site
     backends. Run `make doc` after changing an XML article so that its
     sibling Markdown is current before building the site.
 
-# Arrange the documentation {#document-layout}
+# Documentation layout {#document-layout}
 
-The default convention is intentionally small. Put project articles and explanatory Markdown beneath `doc/`. Put a module's sidecar beside the module, such as `lib/Example/Client.pm.md`, and put an executable's sidecar beside the executable under `bin/`.
+The default convention is to put project articles and explanatory Markdown beneath `doc/`. Put a module's sidecar Markdown beside the module, such as `lib/Example/Client.pm.md`, and put an executable's sidecar beside the executable under `bin/`.
 
 ``` text
 Example-Client/
@@ -44,15 +52,15 @@ Example-Client/
     └── example-client.md
 ```
 
-When `doc/` exists, it is the publication boundary. Top-level Markdown files become generated navigation in source order. Nested Markdown remains available for links but stays out of generated navigation. Module and executable sidecars are mirrored into `lib/` and `bin/` paths in the temporary site, so an article can link to `lib/Example/Client.pm.md` without keeping a second copy under `doc/`.
+If there is no `doc/`, the publisher falls back to the sidecars beneath `lib/` and `bin/` and will. An explicit `sources` list replaces these conventions; it is exact rather than additive. Source files and directories named as sources must exist.
 
-If there is no `doc/`, the publisher falls back to the sidecars beneath `lib/` and `bin/`. An explicit `sources` list replaces these conventions; it is exact rather than additive. Source files and directories named as sources must exist.
+A top-level article containing several level-one Markdown headings is split into sections, one per heading. Links to anchors that move into another page are repaired during assembly. If no `index.md` exists, then the first top-level page also becomes the home page while its original URL remains available.
 
-A top-level article containing several level-one Markdown headings is split into pages. Links to anchors that move into another page are repaired during assembly. If no `index.md` is authored, the first top-level page also becomes the home page while its original URL remains available.
+You can link to markdown documentation for modules and scripts using the convention `lib/Examples/Client.pm.md` - markdown sidecars will be assembled until the `doc/` as a root directory when publishing (i.e. You don't need to specify the document as `../`)
 
-# Add the MakeMaker targets {#makemaker-setup}
+# MakeMaker targets {#makemaker-setup}
 
-Load the documentation-maintenance and publication adapters in `Makefile.PL`. Both imports can be optional for people building a release tarball without the maintainer tools installed. Put the publishing settings in `META_MERGE.x_documentation.publish`.
+Options to customise the output can be added to `Makefile.PL` in `META_MERGE.x_documentation.publish` section, e.g.
 
 ``` perl
 use 5.008;
@@ -88,7 +96,9 @@ WriteMakefile(
 );
 ```
 
-Regenerate the Makefile after changing `Makefile.PL`. The publication settings are encoded into that Makefile, so changing an inline setting also requires regeneration.
+Publisher settings and preferences can also be set with environment variables (see section below).
+
+Regenerate the Makefile after changing `Makefile.PL` as changing an inline setting also requires regeneration.
 
 ``` sh
 perl Makefile.PL
@@ -96,11 +106,11 @@ make doc
 make publish_serve
 ```
 
-When `name` is omitted, the MakeMaker adapter uses the distribution's `NAME`. MkDocs is the default engine, so both `module` and `name` could be omitted in this example. Keeping them visible is useful in a template because it makes the intended site clear.
+When `name` is omitted, the MakeMaker adapter uses the distribution's `NAME` as the documentation title. MkDocs is the default engine, so both `module` and `name` can be omitted in this example. Keeping them visible is useful in a template because it makes the intended site clear.
 
 # Work with the make targets {#make-targets}
 
-Once the Makefile has been generated, the adapter supplies five targets. A typical editing session uses the first two; the remaining targets are deliberate publication steps.
+Once the Makefile has been generated, the adapter supplies targets you can build to.
 
 `make publish_build`
 
@@ -116,7 +126,7 @@ Once the Makefile has been generated, the adapter supplies five targets. A typic
 
 `make publish_gh-push`
 
-: Perform the same local branch update and then push only that branch to `origin`. The push is not forced.
+: Perform the same local branch update and then push only that branch to `origin`. The push is not forced but if no clashes will be propagated immediately.
 
 `make publish_cloudflare`
 
@@ -130,7 +140,7 @@ Engine settings are flat values in the `publish` object. They are not nested ben
 
 `module`
 
-: Selects `mkdocs`, `vitepress`, `docusaurus`, `starlight`, or a fully qualified installed subclass. MkDocs is the default.
+: Selects `mkdocs`, `vitepress`, `docusaurus`, `starlight`, or a fully qualified installed subclass. MkDocs is the default. You can also supply your own custom module if inheriting, e.g. "ACME::Publish"
 
 `sources`
 
@@ -175,7 +185,7 @@ MARKDOWN_PUBLISH_MODULE=vitepress make publish_build
 
 # Select a publishing engine {#selecting-an-engine}
 
-All four engines consume the same assembled Markdown, but their native tooling and configuration differ.
+All four engines consume the same Markdown source, but their native tooling and configuration differ.
 
 ## MkDocs {#mkdocs-engine}
 
@@ -221,7 +231,7 @@ markdown_extensions:
 
 ## VitePress extension function {#vitepress-supplement}
 
-VitePress loads an ECMAScript module. Its default export receives the generated VitePress configuration and a context object. It may be synchronous or asynchronous.
+VitePress loads an ECMAScript module. Its default export receives the generated VitePress configuration and a context object.
 
 ``` javascript
 export default (config, context) => ({
@@ -236,7 +246,7 @@ export default (config, context) => ({
 
 ## Docusaurus extension function {#docusaurus-supplement}
 
-Docusaurus loads a CommonJS module. Its function is synchronous and returns the complete configuration to use.
+Docusaurus loads a CommonJS module. It returns the complete configuration to use.
 
 ``` javascript
 module.exports = (config, context) => ({
@@ -265,8 +275,6 @@ export default ({astro, starlight}, context) => ({
 });
 ```
 
-Each Node extension receives a context containing `name`, `base`, `output`, `pages`, and `navigation`. Preserve generated values with object spread unless you deliberately want to replace them. In particular, keep the generated navigation and Starlight Markdown processor unless your replacement handles the same responsibilities.
-
 # Publish to GitHub Pages {#github-pages}
 
 Start with the local-only action. It builds the site in a temporary directory, creates a temporary Git worktree, replaces the content of the publication branch, commits changed output, and removes the worktree. Your current checkout stays on its existing branch.
@@ -285,14 +293,14 @@ GitHub project sites normally live beneath the repository name. During a GitHub 
 
 !!! warning
 
-    `publish_gh-push` has a remote side effect. Use `publish_gh` when the
+    `publish_gh-push` will push to remote. Use `publish_gh` when the
     repository's authoritative remote is not GitHub, when GitHub is only a
     mirror, or when you want to review the publication commit before pushing
     it.
 
 # Use a project.json file {#project-json}
 
-A standalone project file is useful outside MakeMaker and useful inside it when you want publication settings to change without regenerating the Makefile. The conventional filename is `doc/project.json`. The file may contain the publisher settings directly, beneath `publish`, or in the complete `x_documentation.publish` shape used by MakeMaker.
+A standalone project file can be used outside MakeMaker, or inside it when you want publication settings to change without regenerating the Makefile. The conventional filename is `doc/project.json`. The file may contain the publisher settings directly, beneath `publish`, or in the complete `x_documentation.publish` shape used by MakeMaker.
 
 ``` json
 {
@@ -402,9 +410,9 @@ The MakeMaker and command-line entry points are conveniences. A script can const
 ``` perl
 use strict;
 use warnings;
-use ASPEER::Markdown::Publish;
+use Markdown::Publish;
 
-my $publish_or=ASPEER::Markdown::Publish->new({
+my $publish_or=Markdown::Publish->new({
     module  => 'starlight',
     name    => 'Example::Client',
     sources => ['doc'],
@@ -414,11 +422,11 @@ my $publish_or=ASPEER::Markdown::Publish->new({
 my $site_dn=$publish_or->run('build');
 ```
 
-To read a project file, call `ASPEER::Markdown::Publish->load_config()` or pass only `config_file` to the base constructor.
+To read a project file, call `Markdown::Publish->load_config()` or pass only `config_file` to the base constructor.
 
 ``` perl
 my $publish_or=
-    ASPEER::Markdown::Publish->load_config('doc/project.json');
+    Markdown::Publish->load_config('doc/project.json');
 $publish_or->run('serve');
 ```
 
@@ -476,4 +484,4 @@ An npm installation fails without enough detail
 
 Start with MkDocs and convention-based discovery. Add explicit sources only when the default boundary is not the one you want. Add a supplemental configuration when the generated site needs a theme or integration. Move to an authoritative native configuration only when the project genuinely needs to own the engine's complete layout.
 
-The module reference for `ASPEER::Markdown::Publish` describes its methods and publication contracts. The backend module references document engine-specific settings, and `ASPEER::MakeMaker::Markdown::Publish` documents the MakeMaker adapter. Use those references for exact API details; use this article as the end-to-end map of how the pieces fit together.
+The module reference for `Markdown::Publish` describes its methods and publication contracts. The backend module references document engine-specific settings, and `ASPEER::MakeMaker::Markdown::Publish` documents the MakeMaker adapter. Use those references for exact API details; use this article as the end-to-end map of how the pieces fit together.

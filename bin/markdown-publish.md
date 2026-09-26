@@ -34,3 +34,12 @@ implied by the `origin` repository name: `/<repository>/`, or `/` for an
 `<owner>.github.io` repository.
 
 `--version` prints the installed program version.
+
+# AUTHOR
+
+Andrew Speer <andrew.speer@isolutions.com.au>
+
+# LICENSE AND COPYRIGHT
+
+This software is copyright (c) 2026 by Andrew Speer. It may be distributed
+under the same terms as Perl itself.
