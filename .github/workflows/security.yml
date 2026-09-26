@@ -1,0 +1,28 @@
+name: Security audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '47 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpan-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1.42.0
+        with:
+          perl-version: '5.44.0'
+      - name: Install CPAN Audit
+        run: cpanm --notest CPAN::Audit
+      - name: Audit declared dependencies
+        run: cpan-audit deps .

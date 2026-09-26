@@ -1,6 +1,7 @@
 bin/markdown-publish
 bin/markdown-publish.md
 Changes
+CONTRIBUTING.md
 cpanfile
 doc/markdown-publish.md
 doc/markdown-publish.xml
@@ -28,5 +29,6 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 README
 README.md
+SECURITY.md
 t/01-publish.t
 t/01-site.t

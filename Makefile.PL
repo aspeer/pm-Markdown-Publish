@@ -65,6 +65,7 @@ my %WriteMakefile=(
         'Test::More' => 0,
     },
     META_MERGE => {
+        x_authority => 'cpan:ASPEER',
         'meta-spec' => {version => 2},
         prereqs     => {
             configure => {
@@ -83,13 +84,13 @@ my %WriteMakefile=(
         },
         resources   => {
             bugtracker => {
-                web => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish/issues',
+                web => 'https://github.com/aspeer/pm-Markdown-Publish/issues',
             },
-            homepage   => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish',
+            homepage   => 'https://github.com/aspeer/pm-Markdown-Publish',
             repository => {
                 type => 'git',
-                url  => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish.git',
-                web  => 'https://gitea.isolutions.com.au/aspeer/pm-Markdown-Publish',
+                url  => 'https://github.com/aspeer/pm-Markdown-Publish.git',
+                web  => 'https://github.com/aspeer/pm-Markdown-Publish',
             },
         },
     },
