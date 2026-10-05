@@ -1,0 +1,4 @@
+import{_ as r,o as s,c as n,j as e,a}from"./chunks/framework.DhH8_2wW.js";const m=JSON.parse('{"title":"Quick start","description":"","frontmatter":{},"headers":[],"relativePath":"markdown-publish--quick-start.md","filePath":"markdown-publish--quick-start.md"}'),o={name:"markdown-publish--quick-start.md"};function i(c,t,l,u,d,k){return s(),n("div",null,[...t[0]||(t[0]=[e("h1",{id:"quick-start",tabindex:"-1"},[a("Quick start "),e("a",{class:"header-anchor",href:"#quick-start","aria-label":'Permalink to "Quick start"'},"​")],-1),e("p",null,[a("For quick start configure the MakeMaker adapter, run "),e("code",null,"make doc"),a(", then run "),e("code",null,"make publish_serve"),a(".")],-1),e("pre",null,[e("code",null,`perl -MASPEER::MakeMaker::Markdown::Publish
+make doc
+make publish_serve
+`)],-1)])])}const h=r(o,[["render",i]]);export{m as __pageData,h as default};
