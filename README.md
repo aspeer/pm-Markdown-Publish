@@ -1,7 +1,9 @@
 # Markdown::Publish
 
-Build, preview, and publish Markdown documentation from Perl distribution
-trees with MkDocs, VitePress, Docusaurus, or Astro Starlight.
+Build, preview, and publish Markdown documentation from Perl distribution `doc/`
+trees with MkDocs Material, VitePress, Docusaurus, or Astro Starlight.
+
+Publish to GitHub pages or to a Cloudflare Worker site.
 
 ## Installation
 
@@ -11,7 +13,108 @@ Install the released distribution and its prerequisites from CPAN:
 cpanm Markdown::Publish
 ```
 
-Install the external site generator required for the backend you use.
+Install the external site generator required for the backend you use. You can validate the integrity of the installation using GitHub attestation (see relevant section below)
+
+## Run
+
+Assuming a single Markdown file in your repo `doc/` directory (any file name ending with `.md`).
+
+```sh
+markdown-publish build
+markdown-publish serve
+# Update the local publication branch:
+markdown-publish gh
+# Update it and push that branch to origin:
+markdown-publish gh-push
+# Explicit Cloudflare Workers Static Assets deployment:
+markdown-publish cloudflare --config doc/project.json
+```
+
+If you have the companion ASPEER::MakeMaker::Markdown::Publish module installed:
+
+```sh
+perl -MASPEER::MakeMaker::Markdown::Publish Makefile.PL
+make publish_build
+make publish_serve
+```
+
+## Directory Structure ##
+
+Markdown documentation files for the site are nominally located in the `doc/` directory at the root of the Perl distribution. That location can contain a single Markdown file (the default) or multiple Markdown files (in which case `index.md` will be used or a default must be specified).
+
+The Markdown file can link to other Markdown text in the Perl distribution (such as Markdown sidecar files in distribution root  `/lib` or `/bin` ), and during site assembly for publishing links are converted in such a way as to preserve functionality under a single publishing root directory.
+
+When `doc/` is absent, Markdown sidecars files in `/lib` and `/bin` (if they exist) become the default source pages.
+
+Any Markown file with multiple top-level headings are split into slugged ID-based pages that become navigation section when published.
+
+Nested Markdown under `doc/` is available through links - but is not split or
+added to generated navigation. For each engine, the first top-level page
+becomes the home page when no `index.md` is present.
+
+## Publishing Engines ##
+
+MkDocs Material is the default engine and relevant binaries and libraries must be pre-installed on the target system. Other publishing engines can be specified with `module` in
+`doc/project.json` or with `--module`. The environment variable `MARKDOWN_PUBLISH_MODULE=<engine>`
+overrides either selection when set, with `mkdocs`, `vitepress`, `docusaurus`,
+and `starlight` shortcuts selecting the associated engine.
+
+A fully qualified Perl class/modules name may select another installed `Markdown::Publish` subclass.
+For example, `MARKDOWN_PUBLISH_MODULE=Local::Publish::Module make publish_serve`.
+
+## Configuration ##
+
+Constants/defaults are located in `Markdown::Publish::Constant` and may also be overridden
+by matching environment variables or an adjacent `~/.Markdown::Publish::Constant.pm.local` file.
+
+Settings include source directories, engine configuration path, output
+directory, publication branch, deployment base, and executable names. For
+generated VitePress, Docusaurus, and Starlight configuration, `base` maps to
+the engine's deployment base path; an authored engine configuration remains
+authoritative.
+
+Set `config_extend` to customise generated defaults without replacing them.
+MkDocs inherits the supplied YAML; the Node publishers call an extension
+function with their generated configuration and publication context. It cannot
+be combined with the authoritative `config` setting. See the engine module
+documentation for its extension-module shape.
+For npm-based engines, installation start and completion are always reported.
+
+Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
+To listen on another interface and port with any publisher, run
+`MARKDOWN_PUBLISH_HOST=0.0.0.0 MARKDOWN_PUBLISH_PORT=8002 make publish_serve`.
+Without these settings, each publisher keeps its existing local server address.
+
+## Github and Cloudflare Pages ##
+
+Assembled static pages can be pushed to Github pages or a Cloudflare Worker assets (static pages)
+
+Publishing to Github ( `gh`) requires an existing Git commit and
+configured author identity. It updates the local `gh-pages` branch through a
+temporary worktree without contacting a remote. Push that branch through the
+repository's normal Git workflow when it is ready. If `base` is not configured,
+`gh` derives `/<repository>/` from `origin`, or `/` for an
+`<owner>.github.io` repository. Set `base` explicitly when the published URL
+uses a different path. `gh-push` performs the same local publication and then
+pushes only the publication branch to `origin` without forcing it.
+
+For Cloudflare Worker Static Assets, set `cloudflare.config` in `doc/project.json` to a
+dedicated Wrangler configuration file. The `cloudflare` action builds the
+selected engine and deploys its site directory with Wrangler; it neither
+commits nor pushes Git. Wrangler's existing login or environment supplies
+authentication.
+
+See [API details](lib/Markdown/Publish.pm.md) and [examples](examples/README.md). Each engine has its own module under
+`Markdown::Publish`.
+
+## See Also ##
+
+`ASPEER::MakeMaker::Markdown::Publish` supplies equivalent Makefile targets and
+passes the `META_MERGE.x_documentation.publish` field to this module as a convenient way to publish content and maintain config from `Makefile.PL`
+
+For structured content Docbook articles can be used to generate Markdown content for publishing via the companion `Docbook::Convert` CPAN module. 
+
+Use `Task::Markdown::Publish` to install all dependencies and companion module (see `Docbook::Convert` documentation for system requirements such as `pandoc`, `expat-devel`, `xsltproc`, `xmllint` etc.)
 
 ## GitHub Attestations
 
@@ -32,79 +135,4 @@ attestation from this repository. The workflow publishes the same archive to
 GitHub Releases and CPAN. Older releases and GitHub's automatically generated
 source-code archives are not covered.
 
-## Run
-
-```sh
-markdown-publish build
-markdown-publish serve
-# Update the local publication branch:
-markdown-publish gh
-# Update it and push that branch to origin:
-markdown-publish gh-push
-# Explicit Cloudflare Workers Static Assets deployment:
-markdown-publish cloudflare --config doc/project.json
-```
-
-An existing `doc/` directory is the default publication boundary. During site
-assembly, Markdown under `lib/` and `bin/` is copied into temporary `lib/` and
-`bin/` directories beside the guide, preserving its relative path and filename.
-Write links relative to the authored document so they also work when browsing
-the repository; for example, `doc/guide.md` can link to
-`../lib/Example/Module.pm.md` or `../bin/example.md`. Assembly rebases existing
-sidecar links to their mirrored paths. Existing publication-root links such as
-`lib/Example/Module.pm.md` continue to work. Nothing is copied into the
-repository's `doc/` directory. Mirrored pages are available through links but
-are not added to generated navigation. When `doc/` is absent,
-sidecars become the default source pages; an explicit source list can also
-select them using the existing `modules/` and `utilities/` layout. Guides
-with multiple top-level headings are split into stable ID-based pages.
-Nested Markdown under `doc/` is available through links but is not split or
-added to generated navigation. For each engine, the first top-level page
-becomes the home page when no `index.md` was authored; its original URL remains
-available for links.
-
-MkDocs is the default engine. Select another with `module` in
-`doc/project.json` or with `--module`. `MARKDOWN_PUBLISH_MODULE`
-overrides either selection when set. The `mkdocs`, `vitepress`, `docusaurus`,
-and `starlight` shortcuts select the bundled publishers. A fully qualified
-class name may select another installed `Markdown::Publish` subclass.
-For example, `MARKDOWN_PUBLISH_MODULE=docusaurus make publish_serve`.
-The constants in `Markdown::Publish::Constant` may also be overridden
-by matching environment variables or an adjacent `Constant.pm.local` file.
-Settings include source directories, engine configuration path, output
-directory, publication branch, deployment base, and executable names. For
-generated VitePress, Docusaurus, and Starlight configuration, `base` maps to
-the engine's deployment base path; an authored engine configuration remains
-authoritative.
-Set `config_extend` to customise generated defaults without replacing them.
-MkDocs inherits the supplied YAML; the Node publishers call an extension
-function with their generated configuration and publication context. It cannot
-be combined with the authoritative `config` setting. See the engine module
-documentation for its extension-module shape.
-For npm-based engines, installation start and completion are always reported.
-Set `MARKDOWN_PUBLISH_NPM_VERBOSE=1` to show npm's installation output as well.
-To listen on another interface and port with any publisher, run
-`MARKDOWN_PUBLISH_HOST=0.0.0.0 MARKDOWN_PUBLISH_PORT=8002 make publish_serve`.
-Without these settings, each publisher keeps its existing local server address.
-
-The HTML output defaults to `site/`. `gh` requires an existing Git commit and
-configured author identity. It updates the local `gh-pages` branch through a
-temporary worktree without contacting a remote. Push that branch through the
-repository's normal Git workflow when it is ready. If `base` is not configured,
-`gh` derives `/<repository>/` from `origin`, or `/` for an
-`<owner>.github.io` repository. Set `base` explicitly when the published URL
-uses a different path. `gh-push` performs the same local publication and then
-pushes only the publication branch to `origin` without forcing it.
-
-For Workers Static Assets, set `cloudflare.config` in `doc/project.json` to a
-dedicated Wrangler configuration file. The `cloudflare` action builds the
-selected engine and deploys its site directory with Wrangler; it neither
-commits nor pushes Git. Wrangler's existing login or environment supplies
-authentication.
-
-See [API details](lib/Markdown/Publish.pm.md) and
-[examples](examples/README.md). Each engine has its own module under
-`Markdown::Publish`.
-
-`ASPEER::MakeMaker::Markdown::Publish` supplies equivalent Makefile targets and
-passes the `META_MERGE.x_documentation.publish` field to this module.
+## 
