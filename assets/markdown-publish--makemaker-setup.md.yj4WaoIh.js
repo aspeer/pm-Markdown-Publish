@@ -4,7 +4,9 @@ import{_ as i,o as a,c as n,a0 as e}from"./chunks/framework.DhH8_2wW.js";const g
 <span class="line"><span style="--shiki-light:#D73A49;--shiki-dark:#F97583;">use</span><span style="--shiki-light:#24292E;--shiki-dark:#E1E4E8;"> ExtUtils::MakeMaker;</span></span>
 <span class="line"></span>
 <span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#  Optional way to include Markdown::Publish targets without needing</span></span>
-<span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#  to run &#39;perl -MASPEER::MakeMaker::Markdown::Publish&#39; Makefile.PL</span></span>
+<span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#  to run &#39;perl -MASPEER::MakeMaker::Markdown::Publish Makefile.PL&#39;</span></span>
+<span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#  every time. This will include Makefile targets if the module is </span></span>
+<span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#  available on the system, or continue silently if not</span></span>
 <span class="line"><span style="--shiki-light:#6A737D;--shiki-dark:#6A737D;">#</span></span>
 <span class="line"><span style="--shiki-light:#D73A49;--shiki-dark:#F97583;">eval</span><span style="--shiki-light:#24292E;--shiki-dark:#E1E4E8;"> {</span></span>
 <span class="line"><span style="--shiki-light:#D73A49;--shiki-dark:#F97583;">    require</span><span style="--shiki-light:#24292E;--shiki-dark:#E1E4E8;"> ASPEER::MakeMaker::Markdown::Publish;</span></span>
