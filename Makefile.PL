@@ -77,7 +77,7 @@ my %WriteMakefile=(
         },
         x_documentation => {
             publish => {
-                module  => 'mkdocs',
+                module  => 'vitepress',
                 name    => 'Markdown::Publish',
                 sources => ['doc'],
             },
@@ -86,7 +86,7 @@ my %WriteMakefile=(
             bugtracker => {
                 web => 'https://github.com/aspeer/pm-Markdown-Publish/issues',
             },
-            homepage   => 'https://github.com/aspeer/pm-Markdown-Publish',
+            homepage   => 'https://aspeer.github.io/pm-Markdown-Publish/',
             repository => {
                 type => 'git',
                 url  => 'https://github.com/aspeer/pm-Markdown-Publish.git',

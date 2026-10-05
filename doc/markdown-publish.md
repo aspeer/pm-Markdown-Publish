@@ -1,8 +1,8 @@
 # Publishing documentation with Markdown::Publish {#introduction}
 
-This module lets you publish documentation - either in Docbook XML or Markdown format as a static site using publishing engines such as MkDocs etc. You can preview the output before pushing the finished site to GitHub Pages or another static hosting location.
+This module lets you publish documentation - either in Docbook XML or Markdown format as a static site using publishing engines such as MkDocs Material etc. You can preview the output before pushing the finished site to GitHub Pages, Cloudflare Worker assets or another static hosting location.
 
-The module assembles the documents and hands them to a publishing engine: MkDocs, VitePress, Docusaurus, or Astro Starlight. Its companion module, `ASPEER::MakeMaker::Markdown::Publish`, adds `make` targets to a Perl distribution Makefile. The assembly and publication stage satys in `Markdown::Publish`, so the same setup can be driven by MakeMaker, a JSON project file, the command-line utility, or Perl code.
+The module assembles the documents and hands them to a publishing engine: MkDocs, VitePress, Docusaurus, or Astro Starlight. Its companion module, `ASPEER::MakeMaker::Markdown::Publish`, adds `make` targets to a Perl distribution Makefile. The assembly and publication stage stays in `Markdown::Publish`, so the same setup can be driven by MakeMaker, a JSON project file, the command-line utility, or Perl code.
 
 The rest of this article explains what those commands do, how source discovery works, how to customise each engine, and how to publish without accidentally mixing local builds with remote operations.
 
@@ -10,9 +10,22 @@ The rest of this article explains what those commands do, how source discovery w
 
 For quick start configure the MakeMaker adapter, run `make doc`, then run `make publish_serve`.
 
-    perl -MASPEER::MakeMaker::Markdown::Publish -MASPEER::MakeMaker::Markdown::Pod
+    perl -MASPEER::MakeMaker::Markdown::Publish
     make doc
     make publish_serve
+
+# Full stack
+
+To install all modules associated with publishing documentation with this class (including converting Docbook XML articles to Markdown and publishing) you can optionally install the full stack of dependencies. Not needed for basic operations but will ensure all commands function as expected:
+
+    # Install required system packages. Fedora given, use appropriate for your
+    # distro. Sudo if required.
+    #
+    dnf install -y cpanminus mkdocs-material expat-devel xmllint xlstproc pandoc git
+
+    # Install all modules associated with Markdown::Publish, including MakeMaker helpers
+    #
+    cpanm Task::Markdown::Publish
 
 # Workflow {#mental-model}
 
@@ -68,12 +81,11 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
-eval {
-    require ASPEER::MakeMaker::Markdown::Pod;
-    ASPEER::MakeMaker::Markdown::Pod->import();
-    1;
-};
-
+#  Optional way to include Markdown::Publish targets without needing
+#  to run 'perl -MASPEER::MakeMaker::Markdown::Publish Makefile.PL'
+#  every time. This will include Makefile targets if the module is 
+#  available on the system, or continue silently if not
+#
 eval {
     require ASPEER::MakeMaker::Markdown::Publish;
     ASPEER::MakeMaker::Markdown::Publish->import();
@@ -130,13 +142,13 @@ Once the Makefile has been generated, the adapter supplies targets you can build
 
 `make publish_cloudflare`
 
-: Build the site and deploy its static files with an explicitly configured Wrangler file. It does not update a Git branch.
+: Build the site and deploy its static files with an explicitly configured Wrangler file. It does not update a Git branch. A simple wrangler.json config file is required in the distribution root directory for this option to work.
 
 The targets call the same engine API as the standalone utility. The MakeMaker adapter does not maintain another implementation of site assembly or Git publication.
 
 # Choose the common options {#common-configuration}
 
-Engine settings are flat values in the `publish` object. They are not nested beneath the selected engine name. These options are shared by the normal workflows:
+Engine settings are string values in the `publish` hash in the Makefile.PL META_MERGE x_documentaton section. They are not nested beneath the selected engine name. These options are shared by the normal workflows:
 
 `module`
 
@@ -174,14 +186,14 @@ Engine settings are flat values in the `publish` object. They are not nested ben
 
 : Override the development server listener where the backend supports it.
 
-`MARKDOWN_PUBLISH_MODULE` overrides the configured engine at runtime. This is handy for comparing renderers without editing `Makefile.PL` or a project file:
+`MARKDOWN_PUBLISH_MODULE` environment variables override the configured engine options at runtime. This is handy for comparing renderers without editing `Makefile.PL` or a project file:
 
 ``` sh
 MARKDOWN_PUBLISH_MODULE=starlight make publish_serve
 MARKDOWN_PUBLISH_MODULE=vitepress make publish_build
 ```
 
-`MARKDOWN_PUBLISH_HOST` and `MARKDOWN_PUBLISH_PORT` provide global preview defaults. `MARKDOWN_PUBLISH_NPM_VERBOSE=1` shows normal npm installation output for the Node-based publishers.
+`MARKDOWN_PUBLISH_HOST` and `MARKDOWN_PUBLISH_PORT` provide global preview defaults for port and listening IP. `MARKDOWN_PUBLISH_NPM_VERBOSE=1` shows normal npm installation output for the Node-based publishers.
 
 # Select a publishing engine {#selecting-an-engine}
 
@@ -189,9 +201,9 @@ All four engines consume the same Markdown source, but their native tooling and 
 
 ## MkDocs {#mkdocs-engine}
 
-MkDocs is the default and the lightest choice for this workflow. Install MkDocs and the theme or plugins required by your configuration. The backend accepts `command`, `strict`, `address`, and `output`. Strict builds are enabled by default.
+MkDocs is the default and the lightest choice for this workflow. You must install MkDocs and the theme or plugins required by your configuration using the system package tools - it is not done automatically by this module. The backend accepts `command`, `strict`, `address`, and `output`. Strict builds are enabled by default.
 
-A root `mkdocs.yml` is used directly. Another file named by `config` is normally inherited by a temporary configuration which supplies the assembled `docs_dir`, output directory, and navigation. Set `config_mode` to `direct` only when the authored file deliberately owns those paths as well.
+A root `mkdocs.yml` is used directly if it exists. Another file named by `config` is normally inherited by a temporary configuration which supplies the assembled `docs_dir`, output directory, and navigation. Set `config_mode` to `direct` only when the authored file deliberately owns those paths as well.
 
 ## VitePress {#vitepress-engine}
 
@@ -359,7 +371,7 @@ When a project file is selected explicitly or found automatically, `--module` ca
 
 # Publish static assets with Cloudflare {#cloudflare-publication}
 
-Cloudflare publication requires a dedicated Wrangler configuration. Keep the Worker name, compatibility date, routes, and other deployment settings there. The publisher builds once and passes the actual output directory to Wrangler with `--assets`; it does not rewrite the authored file.
+Cloudflare publication requires a dedicated Wrangler configuration, and assumed the `wrangler` npm package is installed and the binary is available in the path. Keep the Worker name, compatibility date, routes, and other deployment settings there. The publisher builds once and passes the actual output directory to Wrangler with `--assets`; it does not rewrite the authored file.
 
 ``` json
 {
